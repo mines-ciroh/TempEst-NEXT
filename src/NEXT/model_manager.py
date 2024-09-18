@@ -19,16 +19,20 @@ class NEXT(object):
         self.model = model
         self.newt = None
     
+    def from_preproc_data(data):
+        # Initialize from pre-processed data
+        return NEXT(coef_est.build_model_from_data(data))
+    
     def from_data(data):
         # Initialize from raw data
-        return NEXT(coef_est.build_model_from_data(
+        return NEXT.from_preproc_data(
             coef_est.build_training_data(data)
-            ))
+            )
     
     def make_newt(self, data, reset=False):
         # Build a model using provided site data
         if reset or self.newt is None:
-            # TODO: set up dailies and actually initialize model
+            data = data.copy()
             pdata = coef_est.preprocess(data)
             coefs = coef_est.predict_site_coefficients(self.model,
                                                        pdata)

@@ -10,13 +10,13 @@ This file handles data preprocessing and coefficient estimation.
 from pygam import LinearGAM, s
 import pandas as pd
 import numpy as np
-from NEWT import analysis, Watershed
+from NEWT import analysis, statics, Watershed
 
 # Used: ['slope', 'elev_min', 'elev', 'area', 'intercept', 'srad_sd', 'cold_prcp', 'prcp', 'prcp_sd', 'srad', 'water', 'wetland', 'developed', 'ssn_phi', 'Intercept', 'ice_snow', 'vp_sd', 'lat', 'tamp', 'frozen', 'lon', 'ssn_index', 'forest']
 
 inp_cols = ["tmax", "prcp", "srad", "vp",
             "area", "elev_min", "elev", "slope",
-            "forest", "wetland", "developed", "ice_snow",
+            "forest", "wetland", "developed", "ice_snow", "water",
             "lat", "lon"]
 req_cols = inp_cols + ["id"]
 training_req_cols = req_cols + ["temperature"]
@@ -35,12 +35,12 @@ def preprocess(data):
     data["cold_prcp"] = data["prcp"] * data["frozen"]
     predictors = data.groupby("id", as_index=False)[
         inp_cols + ["frozen", "cold_prcp"]].mean().merge(
-        data.groupby("id", as_index=False)[["prcp", "srad", "vp"]],
+        data.groupby("id", as_index=False)[["prcp", "srad", "vp"]].std(),
         on="id", suffixes=["", "_sd"]).merge(
             data.groupby("id").apply(ssn_df, include_groups=False),
             on="id").merge(
                 data.groupby("id").apply(
-                    lambda x: analysis.fit_simple_daily(x, "tmax", True).\
+                    lambda x: statics.fit_simple_daily(x, "tmax", True).\
                         assign(tamp = lambda x: np.sqrt(x["ksin"]**2 + x["kcos"]**2))),
                 on="id"
                 )
@@ -130,11 +130,9 @@ def predict_all_coefficients(model, data):
     """
     Predicts model coefficients for all sites.
     """
-    # Select grouping cols. to preserve useful metadata
-    if "lat" in data.columns and "lon" in data.columns:
-        grouping = ["id", "lat", "lon", "elev"]
-    else:
-        grouping = ["id", "elev"]
-    return data.groupby(grouping, as_index=False).apply(
+    keepll = "lat" in data.columns and "lon" in data.columns
+    keep = data[["id", "elev", "lat", "lon"]] if keepll else data[["id", "elev"]]
+    coefs = data.groupby("id").apply(
         lambda x: predict_site_coefficients(model, x),
         include_groups=False)
+    return coefs.droplevel(1).merge(keep, how="left", on="id")
