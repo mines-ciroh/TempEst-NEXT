@@ -119,7 +119,7 @@ def topo_3dep(geom):
     elev_mean = dem.mean().to_numpy()
     elev_min = dem.min().to_numpy()
     slope = np.sin(xrspatial.slope(dem) * 2 * np.pi / 180).mean().to_numpy()
-    return {"elev_mean": elev_mean, "slope": slope, "elev_min": elev_min}
+    return {"elev": elev_mean, "slope": slope, "elev_min": elev_min}
 
 def topo_merit(geom):
     pass

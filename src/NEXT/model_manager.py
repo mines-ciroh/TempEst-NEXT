@@ -35,17 +35,18 @@ class NEXT(object):
             pickle.dump(self.model, f)
     
     def from_pickle(file):
-        return NEXT(pickle.load(file))
+        with open(file, 'rb') as f:
+            return NEXT(pickle.load(f))
     
     def make_newt(self, data, reset=False):
         # Build a model using provided site data
         if reset or self.newt is None:
             data = data.copy()
+            data["date"] = pd.to_datetime(data["date"])
+            data["day"] = data["date"].dt.day_of_year
             pdata = coef_est.preprocess(data)
             coefs = coef_est.predict_site_coefficients(self.model,
                                                        pdata)
-            data["date"] = pd.to_datetime(data["date"])
-            data["day"] = data["date"].dt.day_of_year
             at_day = data.groupby(["day"], as_index=False)["tmax"].mean().rename(columns={"tmax": "mean_tmax"})
             ssn = rts.ThreeSine(
                 Intercept=coefs["Intercept"].iloc[0],
@@ -72,6 +73,7 @@ class NEXT(object):
                              )
             self.coefficients = coefs
             self.newt = model
+            self.newt.initialize_run()
     
     def run(self, data, reset=False):
         # Prepare and run model.

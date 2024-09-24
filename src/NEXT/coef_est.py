@@ -17,7 +17,7 @@ from NEWT import analysis, statics, Watershed
 inp_cols = ["tmax", "prcp", "srad", "vp",
             "area", "elev_min", "elev", "slope",
             "forest", "wetland", "developed", "ice_snow", "water",
-            "lat", "lon"]
+            "lat", "lon", "date", "day"]
 req_cols = inp_cols + ["id"]
 training_req_cols = req_cols + ["temperature"]
 
@@ -30,7 +30,8 @@ def preprocess(data):
     Convert raw input data into appropriate format, with all required covariates.
     """
     if not all([col in data.columns for col in req_cols]):
-        raise ValueError(f"Missing columns in input data; required: {req_cols}")
+        missing = [col for col in req_cols if not col in data.columns]
+        raise ValueError(f"Missing columns in input data; required: {req_cols}; missing: {missing}")
     data["frozen"] = data["tmax"] < 0    
     data["cold_prcp"] = data["prcp"] * data["frozen"]
     predictors = data.groupby("id", as_index=False)[
