@@ -12,6 +12,7 @@ import NEXT.coef_est as coef_est
 from NEWT import Watershed, engines
 import rtseason as rts
 import pandas as pd
+import pickle
 
 class NEXT(object):
     def __init__(self, model):
@@ -28,6 +29,13 @@ class NEXT(object):
         return NEXT.from_preproc_data(
             coef_est.build_training_data(data)
             )
+    
+    def to_pickle(self, file):
+        with open(file, 'wb') as f:
+            pickle.dump(self.model, f)
+    
+    def from_pickle(file):
+        return NEXT(pickle.load(file))
     
     def make_newt(self, data, reset=False):
         # Build a model using provided site data
