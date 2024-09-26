@@ -35,9 +35,9 @@ nldi = NLDI()
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 
 def gage_geom(usgs_id):
-    # Geometries return (geometry, lat, lon, area in km2)
+    # Geometries return (geometry, lat, lon, area in m2)
     shp = nldi.get_basins(usgs_id)
-    area = (shp.to_crs(projstr).area.rename("area").iloc[0])/1e6
+    area = (shp.to_crs(projstr).area.rename("area").iloc[0])
     rc = nwis.get_record(sites=usgs_id, service="site")[["dec_lat_va", "dec_long_va"]]
     return (shp,
             rc["dec_lat_va"].iloc[0], rc["dec_long_va"].iloc[0], area)
@@ -114,8 +114,13 @@ def lcov_nlcd(geom, start, end):
 lcov_fns = {"nlcd": lcov_nlcd}
 
 # topo requirements: slope, elev_min, elev
-def topo_3dep(geom):
-    dem = p3d.get_dem(geom.geometry.iloc[0], 30)
+def topo_3dep(geom, area):
+    if area < 1e10:
+        dem = p3d.get_dem(geom.geometry.iloc[0], 30)
+    else:
+        # For larger watersheds, use lower-resolution data retrieval to keep
+        # the size manageable.
+        dem = p3d.get_map("DEM", geom.geometry.iloc[0], resolution=1000)
     elev_mean = dem.mean().to_numpy()
     elev_min = dem.min().to_numpy()
     slope = np.sin(xrspatial.slope(dem) * 2 * np.pi / 180).mean().to_numpy()
@@ -136,6 +141,21 @@ obs_fns = {"usgs": obs_usgs}
 def full_data(site, start, end,
               site_type="usgs", weather="daymet", lc="nlcd",
               topo="3dep", obs=None):
+    """
+    Retrieves all required data for a given site, from start to end.  This
+    high-level function allows the user to simply specify sources by name and
+    handles the rest.
+    
+    start, end are strings, which can be either full dates "YYYY-MM-DD" or just
+    years, "YYYY".  If they are just years, then each year will be run individually
+    for weather retrieval.  Why does this matter to a high-level function?
+    Because running one year at a time uses much less memory, so providing
+    years is a good solution if you are running out of memory.
+    
+    Currently, only the default sources are supported.
+    """
+    if (len(start) == 4) != (len(end) == 4):
+        raise ValueError("Start and end must both be YYYY or YYYY-MM-DD.  It appears that one year and one full date were provided.")
     geom_fn = geom_fns[site_type]
     weather_fn = weather_fns[weather]
     lcov_fn = lcov_fns[lc]
@@ -145,10 +165,16 @@ def full_data(site, start, end,
     statics = pd.DataFrame({"id": site, "id_type": site_type,
                             "lat": lat, "lon": lon, "area": area} |
                                       lcov_fn(geom, 1, 1) |
-                                      topo_fn(geom),
+                                      topo_fn(geom, area),
                                       index = [site])
-    dynamics = weather_fn(geom, start, end)#.merge(
-        # lcov_fn(geom, start, end), how="left", on="date")
+    if len(start) > 4:
+        dynamics = weather_fn(geom, start, end)#.merge(
+            # lcov_fn(geom, start, end), how="left", on="date")
+    else:
+        dynamics = pd.concat([
+            weather_fn(geom, str(st) + "-01-01", str(st) + "-12-31")
+            for st in range(int(start), int(end)+1)
+            ])
     if obs_fn is not None:
         dynamics = dynamics.merge(obs_fn(site, start, end),
                                   how="left", on="date")
