@@ -29,6 +29,7 @@ import pygeohydro.nlcd as nlcd
 import py3dep.py3dep as p3d
 import xrspatial
 import numpy as np
+import geopandas as gpd
 
 tid = "10343500"
 nldi = NLDI()
@@ -36,12 +37,27 @@ projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +
 
 def gage_geom(usgs_id):
     # Geometries return (geometry, lat, lon, area in m2)
+    # geometry should be a Geopandas, not a raw geometry
     shp = nldi.get_basins(usgs_id)
     area = (shp.to_crs(projstr).area.rename("area").iloc[0])
     rc = nwis.get_record(sites=usgs_id, service="site")[["dec_lat_va", "dec_long_va"]]
     return (shp,
             rc["dec_lat_va"].iloc[0], rc["dec_long_va"].iloc[0], area)
 
+def gpkg_geoms(path, cumulative=False):
+    # Parse geometries from a geopackage, e.g. for reverse-engineering geometries
+    # for an ngen setup
+    # Returns dictionary of: {id: (geometry, lat, lon, area)}
+    # Assumes columns: id, areasqkm (or tot_drainage_areasqkm), geometry
+    # Uses ws area if not cumulative, otherwise total area.
+    df = gpd.read_file(path)
+    return {
+        row.id: (gpd.GeoDataFrame(row, index=row._fields).T,  # make the tuple back into a single-row gdf
+                 row.geometry.centroid.y,
+                 row.geometry.centroid.x,
+                 (row.tot_drainage_areasqkm if cumulative else row.areasqkm) * 1000)  #km2 -> m2
+        for row in df.itertuples()
+        }
 
 def nhd_geom(nhd_id):
     pass
@@ -138,6 +154,34 @@ def obs_usgs(usgs_id, start, end):
 obs_fns = {"usgs": obs_usgs}
 
 
+def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
+                   weather="daymet", lc="nlcd",
+                   topo="3dep", obs=None):
+    # Implements data-retrieval logic for a specified geometry.  See full_data
+    # docs.
+    weather_fn = weather_fns[weather]
+    lcov_fn = lcov_fns[lc]
+    topo_fn = topo_fns[topo]
+    obs_fn = obs_fns[obs] if obs is not None else None
+    statics = pd.DataFrame({"id": site, "id_type": site_type,
+                            "lat": lat, "lon": lon, "area": area} |
+                                      lcov_fn(geom, 1, 1) |
+                                      topo_fn(geom, area),
+                                      index = [site])
+    if len(start) > 4:
+        dynamics = weather_fn(geom, start, end)#.merge(
+            # lcov_fn(geom, start, end), how="left", on="date")
+    else:
+        dynamics = pd.concat([
+            weather_fn(geom, str(st) + "-01-01", str(st) + "-12-31")
+            for st in range(int(start), int(end)+1)
+            ])
+    if obs_fn is not None:
+        dynamics = dynamics.merge(obs_fn(site, start, end),
+                                  how="left", on="date")
+    return statics.merge(dynamics, how="cross")
+
+
 def full_data(site, start, end,
               site_type="usgs", weather="daymet", lc="nlcd",
               topo="3dep", obs=None):
@@ -157,27 +201,16 @@ def full_data(site, start, end,
     if (len(start) == 4) != (len(end) == 4):
         raise ValueError("Start and end must both be YYYY or YYYY-MM-DD.  It appears that one year and one full date were provided.")
     geom_fn = geom_fns[site_type]
-    weather_fn = weather_fns[weather]
-    lcov_fn = lcov_fns[lc]
-    topo_fn = topo_fns[topo]
-    obs_fn = obs_fns[obs] if obs is not None else None
     (geom, lat, lon, area) = geom_fn(site)
-    statics = pd.DataFrame({"id": site, "id_type": site_type,
-                            "lat": lat, "lon": lon, "area": area} |
-                                      lcov_fn(geom, 1, 1) |
-                                      topo_fn(geom, area),
-                                      index = [site])
-    if len(start) > 4:
-        dynamics = weather_fn(geom, start, end)#.merge(
-            # lcov_fn(geom, start, end), how="left", on="date")
-    else:
-        dynamics = pd.concat([
-            weather_fn(geom, str(st) + "-01-01", str(st) + "-12-31")
-            for st in range(int(start), int(end)+1)
-            ])
-    if obs_fn is not None:
-        dynamics = dynamics.merge(obs_fn(site, start, end),
-                                  how="left", on="date")
-    return statics.merge(dynamics, how="cross")
+    return geom_full_data(site, site_type, geom, lat, lon, area, start, end,
+                          weather, lc, topo, obs)
     
 
+def all_data_gpgk(path, start, end, site_type="usgs", weather="daymet", lc="nlcd",
+                  topo="3dep", obs=None, cumulative=False):
+    """
+    Wraps full_data to get everything for each site in a geopackage at path.
+    """
+    gpdata = gpkg_geoms(path, cumulative)
+    return {k: geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end)
+            for k, v in gpdata.items()}

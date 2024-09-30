@@ -75,6 +75,8 @@ class NEXT(object):
             self.newt = model
             self.newt.initialize_run()
     
+    def convert_at_units(self):
+    
     def run(self, data, reset=False):
         # Prepare and run model.
         self.make_newt(data, reset)
