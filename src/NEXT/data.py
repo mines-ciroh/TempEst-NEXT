@@ -52,7 +52,7 @@ def gpkg_geoms(path, cumulative=False):
     # Uses ws area if not cumulative, otherwise total area.
     df = gpd.read_file(path)
     return {
-        row.id: (gpd.GeoDataFrame(row, index=row._fields).T,  # make the tuple back into a single-row gdf
+        row.id: (gpd.GeoDataFrame(row, index=row._fields).T.set_geometry("geometry"),  # make the tuple back into a single-row gdf
                  row.geometry.centroid.y,
                  row.geometry.centroid.x,
                  (row.tot_drainage_areasqkm if cumulative else row.areasqkm) * 1000)  #km2 -> m2
