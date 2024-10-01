@@ -208,10 +208,13 @@ def full_data(site, start, end,
     
 
 def all_data_gpkg(path, start, end, weather="daymet", lc="nlcd",
-                  topo="3dep", obs=None, cumulative=False):
+                  topo="3dep", obs=None, cumulative=False, handler=lambda k, g, e: None):
     """
     Wraps full_data to get everything for each site in a geopackage at path.
     """
     gpdata = gpkg_geoms(path, cumulative)
     for k, v in gpdata.items():
-        yield (k, geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end))
+        try:
+            yield (k, geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end))
+        except Exception as e:
+            yield (k, handler(k, v[0], e))
