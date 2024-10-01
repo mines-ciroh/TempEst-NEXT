@@ -38,7 +38,7 @@ class NEXT(object):
         with open(file, 'rb') as f:
             return NEXT(pickle.load(f))
     
-    def make_newt(self, data, reset=False):
+    def make_newt(self, data, start_date="2020-01-01", reset=False):
         # Build a model using provided site data
         if reset or self.newt is None:
             data = data.copy()
@@ -73,9 +73,8 @@ class NEXT(object):
                              )
             self.coefficients = coefs
             self.newt = model
-            self.newt.initialize_run()
-    
-    def convert_at_units(self):
+            self.newt.initialize_run(start=start_date)
+        return self
     
     def run(self, data, reset=False):
         # Prepare and run model.
