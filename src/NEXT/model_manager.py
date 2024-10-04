@@ -8,7 +8,7 @@ This file contains a model-manager class that actually handles model building,
 etc.  Mostly a wrapper around coef_est.
 """
 
-import NEXT.coef_est as coef_est
+import NEWT.coef_est as coef_est
 from NEWT import Watershed, engines
 import rtseason as rts
 import pandas as pd
@@ -38,7 +38,11 @@ class NEXT(object):
         with open(file, 'rb') as f:
             return NEXT(pickle.load(f))
     
-    def make_newt(self, data, start_date="2020-01-01", reset=False):
+    def from_default_pickle():
+        return NEXT.from_pickle("coefs.pickle")
+    
+    def make_newt(self, data, start_date="2020-01-01", climyears=0, reset=False,
+                  **kwargs):
         # Build a model using provided site data
         if reset or self.newt is None:
             data = data.copy()
@@ -69,7 +73,11 @@ class NEXT(object):
                                   coef_min=coefs["threshold_coef_min"].iloc[0],
                                   act_cutoff=coefs["threshold_act_cutoff"].iloc[0],
                                   coef_max=coefs["threshold_coef_max"].iloc[0]
-                              )
+                              ),
+                              climate_engine=engines.ClimateCoefficientEngine(self.model, years=climyears),
+                              climate_period=365,
+                              extra_history_columns=engines.ClimateCoefficientEngine.required_columns,
+                              **kwargs
                              )
             self.coefficients = coefs
             self.newt = model
