@@ -41,7 +41,8 @@ class NEXT(object):
     def from_default_pickle():
         return NEXT.from_pickle("coefs.pickle")
     
-    def make_newt(self, data, start_date="2020-01-01", climyears=0, reset=False,
+    def make_newt(self, data, start_date="2020-01-01", use_climate=True,
+                  climyears=0, reset=False,
                   **kwargs):
         # Build a model using provided site data
         if reset or self.newt is None:
@@ -74,9 +75,9 @@ class NEXT(object):
                                   act_cutoff=coefs["threshold_act_cutoff"].iloc[0],
                                   coef_max=coefs["threshold_coef_max"].iloc[0]
                               ),
-                              climate_engine=engines.ClimateCoefficientEngine(self.model, years=climyears),
+                              climate_engine=engines.ClimateCoefficientEngine(self.model, years=climyears) if use_climate else None,
                               climate_period=365,
-                              extra_history_columns=engines.ClimateCoefficientEngine.required_columns,
+                              extra_history_columns=engines.ClimateCoefficientEngine.required_columns if use_climate else [],
                               **kwargs
                              )
             self.coefficients = coefs
