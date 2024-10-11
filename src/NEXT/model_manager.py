@@ -9,6 +9,7 @@ etc.  Mostly a wrapper around coef_est.
 """
 
 import NEWT.coef_est as coef_est
+import NEWT.make_coefficients as mcoef
 from NEWT import Watershed, engines
 import rtseason as rts
 import pandas as pd
@@ -27,7 +28,7 @@ class NEXT(object):
     def from_data(data):
         # Initialize from raw data
         return NEXT.from_preproc_data(
-            coef_est.build_training_data(data)
+            mcoef.build_training_data(data)
             )
     
     def to_pickle(self, file):
@@ -85,9 +86,9 @@ class NEXT(object):
             self.newt.initialize_run(start=start_date)
         return self
     
-    def run(self, data, reset=False):
+    def run(self, data, reset=False, **args):
         # Prepare and run model.
-        self.make_newt(data, reset)
+        self.make_newt(data, reset=reset, **args)
         return self.newt.run_series(data)
     
     def get_newt(self):
