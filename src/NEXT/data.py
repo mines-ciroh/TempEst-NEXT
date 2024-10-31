@@ -95,6 +95,8 @@ def get_upstream(coordinates, dist=1):
     # Retrieve all contributing basins EXCEPT direct mainstem reaches
     if len(tribs) > 0:
         trib_bas = nldi.get_basins(tribs["nhdplus_comid"], "comid").assign(what="tributary")
+        trib_bas["endpoint"] = tribs.geometry.apply(get_endpoint).to_list()
+        trib_bas["area"] = trib_bas.to_crs(projstr).area
     else:
         trib_bas = None
     # Now figure out the mainstem basin for the top of the reach of interest
@@ -289,6 +291,29 @@ def full_data(site, start, end,
     (geom, lat, lon, area) = geom_fn(site)
     return geom_full_data(site, site_type, geom, lat, lon, area, start, end,
                           weather, lc, topo, obs)
+
+
+def all_data_reaches(coords, dist, buff, start, end, weather="daymet", lc="nlcd",
+                  topo="3dep", as_df=False):
+    (trib, upper, main) = get_upstream(coords, dist)
+    trib["id"] = trib.index
+    main_geo = gpd.GeoDataFrame(geometry=buffer(main, buff)).\
+        assign(id=main["nhdplus_comid"].iloc[0]).dissolve(by="id").\
+            reset_index()
+    trib_data = pd.concat(trib.apply(lambda x: geom_full_data(
+        x["id"], "tributary", gpd.GeoSeries(x.geometry, crs=4326),
+        x["endpoint"][1], x["endpoint"][0],
+        x["area"], start, end, weather, lc, topo),
+        axis=1).to_list())
+    upper_data = geom_full_data(upper.index[0], "mainstem_ws", upper, coords[1],
+                                coords[0], upper.to_crs(projstr).area.iloc[0],
+                                start, end, weather, lc, topo)
+    main_data = geom_full_data(main_geo["id"].iloc[0], "mainstem", main_geo,
+                               coords[1], coords[0], main_geo.to_crs(projstr).area.iloc[0],
+                               start, end, weather, lc, topo)
+    if as_df:
+        return pd.concat([trib_data, upper_data, main_data])
+    return (trib_data, upper_data, main_data)
 
 
 def all_data_gpkg(path, start, end, weather="daymet", lc="nlcd",
