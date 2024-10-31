@@ -24,16 +24,71 @@ import pandas as pd
 # import geopandas as gpd
 import dataretrieval.nwis as nwis
 from pynhd import NLDI
+import pynhd.pynhd as nhd
 import pydaymet.pydaymet as dym
 import pygeohydro.nlcd as nlcd
 import py3dep.py3dep as p3d
 import xrspatial
 import numpy as np
 import geopandas as gpd
+import shapely as shp
 
 tid = "10343500"
 nldi = NLDI()
+catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+# This is on a river, but there are no gages nearby.
+testco = (-106.2403, 38.5408)
+testpt = gpd.GeoSeries([shp.Point(testco)], crs=4326)
+tcomid = "918351"
+
+
+def get_endpoint(lstr):
+    # Retrieve endpoint coordinates of a LineString.
+    return lstr.coords[-1]
+
+
+def unroll_coords(reaches):
+    """
+    Reaches is a GeoDataFrame containing linestring geometries (i.e., reaches).
+    Unrolls to extract all coordinate pairs as a list.
+    """
+    # List of lists of coordinates; need to un-nest
+    clists = list(reaches.geometry.apply(lambda x: list(x.coords)))
+    return [coords for cl in clists for coords in cl]
+
+
+def get_upstream(coordinates, dist=1):
+    """
+    Retrieve upstream flow network from a given coordinates.
+    Coordinates: (lon, lat) in WGS84 decimal degrees.
+    dist: Range in km.  Set to the length of the reach of interest.
+    Tributaries are used to construct subwatershed models.  Mainstem is passed
+    along as-is for use to extract a riparian buffer, etc.
+    """
+    main = nldi.navigate_byloc(coordinates, "upstreamMain", source="flowlines",
+                                distance=dist)
+    mco = unroll_coords(main)
+    tribs = nldi.navigate_byloc(coordinates, "upstreamTributaries", source="flowlines",
+                                distance=dist)
+    # Get tributaries that aren't in the mainstem, but do drain into it
+    tribs = tribs[-(tribs["nhdplus_comid"].isin(main["nhdplus_comid"])) &
+                  (tribs.geometry.apply(get_endpoint).isin(mco))]
+    # Retrieve all contributing basins EXCEPT direct mainstem reaches
+    if len(tribs) > 0:
+        trib_bas = nldi.get_basins(tribs["nhdplus_comid"], "comid").assign(what="tributary")
+    else:
+        trib_bas = None
+    # Now figure out the mainstem basin for the top of the reach of interest
+    upper = nldi.get_basins(main["nhdplus_comid"].iloc[-1], "comid").assign(what="mainstem")
+    return (trib_bas, upper, main)
+
+
+def combined_areas(coordinates, dist=1):
+    (trib, up, main) = get_upstream(coordinates, dist)
+    return pd.concat([trib, up])
+    
+
 
 def gage_geom(usgs_id):
     # Geometries return (geometry, lat, lon, area in m2)
