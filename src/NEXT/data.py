@@ -39,6 +39,7 @@ catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 # This is on a river, but there are no gages nearby.
 testco = (-106.2403, 38.5408)
+testco_site = ":".join([str(x) for x in testco])
 testpt = gpd.GeoSeries([shp.Point(testco)], crs=4326)
 tcomid = "918351"
 
@@ -57,6 +58,23 @@ def unroll_coords(reaches):
     clists = list(reaches.geometry.apply(lambda x: list(x.coords)))
     return [coords for cl in clists for coords in cl]
 
+
+def get_watershed(coordinates):
+    """
+    Retrieve watershed shape for a given set of coordinates.
+    """
+    comid = nldi.comid_byloc(coordinates)["comid"].iloc[0]
+    ws = nldi.get_basins(comid, "comid")
+    area = ws.to_crs(projstr).area
+    return (ws, coordinates[1], coordinates[0], area.iloc[0])
+
+def watershed_geom(site):
+    """
+    Watershed retriever with appropriate syntax.  Uses a coordinate string
+    which is 'lon:lat'.
+    """
+    coords = [float(x) for x in site.split(":")]
+    return get_watershed(coords)
 
 def get_upstream(coordinates, dist=1):
     """
@@ -87,7 +105,17 @@ def get_upstream(coordinates, dist=1):
 def combined_areas(coordinates, dist=1):
     (trib, up, main) = get_upstream(coordinates, dist)
     return pd.concat([trib, up])
-    
+
+
+def buffer(data, buffer):
+    """
+    Apply a buffer (in meters) to data that is in decimal degrees.
+    Buffer is a straightforward Shapely/GeoPandas method in a projected CRS
+    (with meters, etc), but it's inappropriate with lat/lon.
+    This function simply projects into meters, buffers, and reprojects.
+    Assumes original CRS is 4326 (WGS84).
+    """
+    return data.to_crs(projstr).buffer(buffer).to_crs(4326)
 
 
 def gage_geom(usgs_id):
@@ -122,7 +150,8 @@ def merit_geom(merit_id):
     # I don't know if this is straightforwardly doable, but useful for non-CONUS.
     pass
 
-geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom}
+geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom,
+            "coordinates": watershed_geom}
 
 # Weather requirements: tmax, prcp, srad, vp
 wvars = ["tmax", "prcp", "srad", "vp"]
@@ -260,7 +289,7 @@ def full_data(site, start, end,
     (geom, lat, lon, area) = geom_fn(site)
     return geom_full_data(site, site_type, geom, lat, lon, area, start, end,
                           weather, lc, topo, obs)
-    
+
 
 def all_data_gpkg(path, start, end, weather="daymet", lc="nlcd",
                   topo="3dep", obs=None, cumulative=False, handler=lambda k, g, e: None):
