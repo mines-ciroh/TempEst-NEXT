@@ -320,6 +320,8 @@ def all_data_reaches(coords, dist, buff, start, end, weather="daymet", lc="nlcd"
         x["endpoint"][1], x["endpoint"][0],
         x["area"], start, end, weather, lc, topo),
         axis=1).to_list())
+    if type(coords) == str:
+        coords = get_endpoint(main.geometry.iloc[0])
     upper_data = geom_full_data(upper.index[0], "mainstem_ws", upper, coords[1],
                                 coords[0], upper.to_crs(projstr).area.iloc[0],
                                 start, end, weather, lc, topo)
