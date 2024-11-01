@@ -42,6 +42,7 @@ testco = (-106.2403, 38.5408)
 testco_site = ":".join([str(x) for x in testco])
 testpt = gpd.GeoSeries([shp.Point(testco)], crs=4326)
 tcomid = "918351"
+tusgs = "usgs:10343500"
 
 
 def get_endpoint(lstr):
@@ -97,6 +98,7 @@ def get_upstream(coordinates, dist=1):
             raise ValueError("Invalid site ID category: get_upstream")
         if ltype == "usgs":
             ltype = "nwissite"
+            loc = "USGS-" + loc
     main = nldi.navigate_byid(ltype, loc, "upstreamMain", source="flowlines",
                                 distance=dist)
     mco = unroll_coords(main)
