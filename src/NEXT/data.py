@@ -79,15 +79,28 @@ def watershed_geom(site):
 def get_upstream(coordinates, dist=1):
     """
     Retrieve upstream flow network from a given coordinates.
-    Coordinates: (lon, lat) in WGS84 decimal degrees.
+    Coordinates: (lon, lat) in WGS84 decimal degrees.  Alternatively,
+        a string specifying a USGS gage ID or NHD+ COMID, of the form
+        "usgs:12345" or "comid:12345".
     dist: Range in km.  Set to the length of the reach of interest.
     Tributaries are used to construct subwatershed models.  Mainstem is passed
     along as-is for use to extract a riparian buffer, etc.
     """
-    main = nldi.navigate_byloc(coordinates, "upstreamMain", source="flowlines",
+    if type(coordinates) != tuple and type(coordinates) != str:
+        raise ValueError("Invalid coordinate format: get_upstream")
+    if type(coordinates) == tuple:
+        loc = nldi.feature_byloc(coordinates)["comid"].iloc[0]
+        ltype = "comid"
+    else:
+        [ltype, loc] = coordinates.split(":")
+        if ltype not in ["usgs", "comid"]:
+            raise ValueError("Invalid site ID category: get_upstream")
+        if ltype == "usgs":
+            ltype = "nwissite"
+    main = nldi.navigate_byid(ltype, loc, "upstreamMain", source="flowlines",
                                 distance=dist)
     mco = unroll_coords(main)
-    tribs = nldi.navigate_byloc(coordinates, "upstreamTributaries", source="flowlines",
+    tribs = nldi.navigate_byid(ltype, loc, "upstreamTributaries", source="flowlines",
                                 distance=dist)
     # Get tributaries that aren't in the mainstem, but do drain into it
     tribs = tribs[-(tribs["nhdplus_comid"].isin(main["nhdplus_comid"])) &
