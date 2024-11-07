@@ -20,6 +20,11 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 
+test_id = "394220106431500"
+tstart = "2020-05-01"
+tend = "2020-09-30"
+tcache = "../../tmp/"
+
 def get_all_data(raw_id, dist, buffer, start, end, cache_base=None,
                  plot_ws=False):
     """
@@ -139,6 +144,19 @@ def noreach_withobs(inputs, nxmod, raw_id, start, end):
     rivdat = inputs[inputs["id_type"] == "mainstem"]
     return comb.merge(rivdat, on="date")
 
+def prepare_full_data(nxmod, raw_id, dist, buffer, start, end, cache_base=None,
+                 plot_ws=False):
+    """
+    Fully prepare data for further use, combining noreach_withobs and get_all_data.
+    See documentation for those two.  nxmod may be a str, in which case it is interpreted
+    as a pickle file.
+    """
+    if type(nxmod) == str:
+        nxmod = NEXT.from_pickle(nxmod)
+    return noreach_withobs(get_all_data(raw_id, dist, buffer, start, end,
+                                        cache_base, plot_ws),
+                           nxmod, raw_id, start, end)
+
 def monoreach_maker(alpha, r, k, q):
     """
     Prepare a monoreach (uniform equilibration) prediction function using
@@ -223,17 +241,23 @@ def mk_range(low, high, N=5):
     high : float
         High value.
     N : int, optional
-        DESCRIPTION. The default is 5.
+        Number of increments (>= 2). The default is 5.
 
     Returns
     -------
-    None.
+    np.array
+        The desired range.
 
     """
+    if N < 2:
+        raise ValueError("mk_range: N must be >=2")
+    step = (high - low) / (N-1)
+    return np.arange(low, high+step/2, step)
 
 
 def search_reach_coefficients(indat, arange, rrange, krange, qrange,
-                              tolerance=0.005, validate=True, log=False):
+                              tolerance=0.005, validate=True, log=False,
+                              maxit = 100):
     """
     Searches the parameter space to identify optimal coefficients.  Returns
     optimal coefficients, and their performance as R.  If validate is true,
@@ -253,15 +277,17 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
         Minimum and maximum permitted values for q.
     tolerance : float, optional
         Performance threshold for convergence. The default is 0.005.
-    validate: bool, optional
+    validate : bool, optional
         Whether to report performance for a separate validation set.
-    log: bool, optional
+    log : bool, optional
         Whether to also return a data frame of iterations.
+    maxit : int, optional
+        Maximum number of iterations.
 
     Returns
     -------
-    ((float, float, float, float), float)
-        Tuple of optimal alpha, r, k, q; then R
+    dictionary
+        Dictionary of optimal alpha, r, k, q, and R
 
     """
     if validate:
@@ -289,12 +315,75 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
     """
     best = -1
     delta = 1
+    its = 0
+    ranges = {"alpha": arange, "r": rrange, "k": krange, "q": qrange}
+    fits = {k: 0 for k in ranges}
     if log:
         history = {"alpha": [], "r": [], "k": [], "q": [], "R": []}
-    while delta > tolerance:
-        params = pd.DataFrame({"A": unrg(Amin, Amax)}).\
-            merge(pd.DataFrame({"B": unrg(Bmin, Bmax)}), how="cross").\
-            merge(pd.DataFrame({"C": unrg(Cmin, Cmax)}), how="cross").\
-            merge(pd.DataFrame({"q": unrg(qmin, qmax)}), how="cross")
-        params["R"] = params.apply(lambda x: reachperf(x["A"], x["B"], x["C"], x["q"]), axis=1)
+    while (delta > tolerance or delta < 0) and its < maxit:
+        its += 1
+        # Compute all performances.
+        params = pd.DataFrame({"alpha": mk_range(*ranges["alpha"])}).\
+            merge(pd.DataFrame({"r": mk_range(*ranges["r"])}), how="cross").\
+            merge(pd.DataFrame({"k": mk_range(*ranges["k"])}), how="cross").\
+            merge(pd.DataFrame({"q": mk_range(*ranges["q"])}), how="cross")
+        params["R"] = params.apply(
+            lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train),
+            axis=1)
+        params = params.sort_values("R", ascending=False)
+        # Select best runs.
+        best_rows = params.iloc[:25]
+        # Quick aside: update optima.
+        nbest = best_rows["R"].iloc[0]
+        delta = nbest - best
+        best = nbest
+        for key, (low, high) in ranges.items():
+            best_fits = best_rows[key]
+            increments = mk_range(low, high)
+            new_low = low
+            new_high = high
+            # All on one side
+            if all(best_fits >= increments[2]) or all(best_fits <= increments[2]):
+                # Which side?
+                tophalf = all(best_fits >= increments[2])
+                extreme = increments[4] if tophalf else increments[0]
+                if tophalf:
+                    new_low = increments[2]
+                else:
+                    new_high = increments[2]
+                # Extreme-weighted
+                if sum(best_fits == extreme) / 25 > 0.5:
+                    # Extreme-upper-weighted
+                    if tophalf:
+                        if high > 0:
+                            new_high = high * 2
+                        else:
+                            # Adjust upwards by the gap, so it doesn't get stuck at 0 or get more negative
+                            new_high = high * 2 - low
+                    else:
+                        if low < 0:
+                            new_low = low * 2
+                        else:
+                            # Adjust downwards by the gap, so it doesn't get stuck at 0 or get more positive
+                            new_low = low * 2 - high
+                # If it's not extreme-weighted, we already moved in the other
+                # end and don't need to do anything else.
+            else:
+                # Not all on one side.  Check if they're in the middle.
+                if all(best_fits >= increments[1]) and all(best_fits <= increments[3]):
+                    new_high = increments[3]
+                    new_low = increments[1]
+            ranges[key] = (new_low, new_high)
+            fits[key] = best_fits.iloc[0]
+            if log:
+                history[key].append(best_fits.iloc[0])
+        if log:
+            history["R"].append(best)
+    best = reachperf(fits["alpha"], fits["r"], fits["k"], fits["q"], test)
+    fits["R"] = best
+    if log:
+        return (fits, pd.DataFrame(history))
+    else:
+        return fits
+        
     
