@@ -24,6 +24,7 @@ test_id = "394220106431500"
 tstart = "2020-05-01"
 tend = "2020-09-30"
 tcache = "../../tmp/"
+filen = tcache + "inputs_394220106431500_5km_500m.csv"
 
 def get_all_data(raw_id, dist, buffer, start, end, cache_base=None,
                  plot_ws=False):
@@ -62,7 +63,7 @@ def get_all_data(raw_id, dist, buffer, start, end, cache_base=None,
     if cache_base is not None:
         path = cache_base + f"inputs_{raw_id}_{dist}km_{buffer}m.csv"
         if os.path.exists(path):
-            return pd.read_csv(path, dtype={"id": "str"}, parse_dates=True)
+            return pd.read_csv(path, dtype={"id": "str"}, parse_dates=["date"])
     (trib, up, main) = data.get_upstream(site, dist)
     if plot_ws:
         ax = up.plot(color="green")
