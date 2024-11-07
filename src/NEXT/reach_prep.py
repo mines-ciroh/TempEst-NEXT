@@ -196,14 +196,14 @@ def monoreach_maker(alpha, r, k, q):
     """
     def delta(indat):
         return (indat["tmax"] - indat["tmod"]) * (
-            1 - np.exp(-alpha / (indat["Q"] ** q))) - (
+            1 - np.exp(-alpha / (indat["Q"] ** q))) + (
                 r * indat["srad"] + k) / (indat["Q"] ** q)
     return delta
 
+
 def reachperf(alpha, r, k, q, indat):
     """
-    Computes performance, as R (not R2, since high performance in the wrong
-    direction is possible), for the given set of coefficients.
+    Computes performance for the given set of coefficients.
 
     Parameters
     ----------
@@ -217,16 +217,18 @@ def reachperf(alpha, r, k, q, indat):
         Flow sensitivity coefficient.
     indat : pandas.DataFrame
         Input data frame containing tmax, tmod, Q, srad, delta (observed).
+    perf : (array, array) -> float
+        Function of (sim, obs) computing performance.
 
     Returns
     -------
     float
-        Correlation coefficient between modeled and observed Delta-T.
+        Computed performance metric using the provided function.
 
     """
     dmod = monoreach_maker(alpha, r, k, q)(indat)
     dobs = indat["delta"]
-    return dmod.corr(dobs)
+    return (dobs.corr(dmod), (dmod - dobs).mean())
 
 
 def mk_range(low, high, N=5):
@@ -256,7 +258,7 @@ def mk_range(low, high, N=5):
 
 
 def search_reach_coefficients(indat, arange, rrange, krange, qrange,
-                              tolerance=0.005, validate=True, log=False,
+                              tolerance=0.0001, validate=True, log=False,
                               maxit = 100):
     """
     Searches the parameter space to identify optimal coefficients.  Returns
@@ -287,7 +289,7 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
     Returns
     -------
     dictionary
-        Dictionary of optimal alpha, r, k, q, and R
+        Dictionary of optimal alpha, r, k, q, and NSE
 
     """
     if validate:
@@ -316,11 +318,13 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
     best = -1
     delta = 1
     its = 0
+    topN = 25
     ranges = {"alpha": arange, "r": rrange, "k": krange, "q": qrange}
     fits = {k: 0 for k in ranges}
     if log:
         history = {"alpha": [], "r": [], "k": [], "q": [], "R": []}
-    while (delta > tolerance or delta < 0) and its < maxit:
+    # False convergence is possible early on.  Give it some space.
+    while (delta > tolerance or its < 10) and its < maxit:
         its += 1
         # Compute all performances.
         params = pd.DataFrame({"alpha": mk_range(*ranges["alpha"])}).\
@@ -328,11 +332,19 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
             merge(pd.DataFrame({"k": mk_range(*ranges["k"])}), how="cross").\
             merge(pd.DataFrame({"q": mk_range(*ranges["q"])}), how="cross")
         params["R"] = params.apply(
-            lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train),
+            lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train)[0],
             axis=1)
+        params["bias"] = params.apply(
+            lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train)[1],
+            axis=1).abs()
+        # Require relatively low absolute bias first
+        # params = params[params["bias"].abs() < params["bias"].abs().quantile(0.25)]
         params = params.sort_values("R", ascending=False)
         # Select best runs.
-        best_rows = params.iloc[:25]
+        # best_rows = params.iloc[:topN].sort_values("bias")
+        # Let's try iterating a few times to optimize for both...
+        best_rows = params.iloc[:(topN * 4)].sort_values(
+            "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
         # Quick aside: update optima.
         nbest = best_rows["R"].iloc[0]
         delta = nbest - best
@@ -352,7 +364,7 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
                 else:
                     new_high = increments[2]
                 # Extreme-weighted
-                if sum(best_fits == extreme) / 25 > 0.5:
+                if sum(best_fits == extreme) / topN > 0.5:
                     # Extreme-upper-weighted
                     if tophalf:
                         if high > 0:
@@ -379,8 +391,8 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
                 history[key].append(best_fits.iloc[0])
         if log:
             history["R"].append(best)
-    best = reachperf(fits["alpha"], fits["r"], fits["k"], fits["q"], test)
-    fits["R"] = best
+    best = reachperf(**fits, indat=test)
+    (fits["R"], fits["bias"]) = best
     if log:
         return (fits, pd.DataFrame(history))
     else:
