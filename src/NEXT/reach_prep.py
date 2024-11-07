@@ -343,13 +343,13 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
             axis=1).abs()
         # Require relatively low absolute bias first
         # params = params[params["bias"].abs() < params["bias"].abs().quantile(0.25)]
-        params = params[(params["bias"] <= best_bias * 2) & (params["R"] >= best - 0.1)]
+        # params = params[(params["bias"] <= best_bias * 2) & (params["R"] >= best - 0.1)]
         params = params.sort_values("R", ascending=False)
         # Select best runs.
-        best_rows = params.iloc[:topN]
+        # best_rows = params.iloc[:topN]
         # Let's try iterating a few times to optimize for both...
-        # best_rows = params.iloc[:(topN * 4)].sort_values(
-        #     "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
+        best_rows = params.iloc[:(topN * 4)].sort_values(
+            "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
         # Quick aside: update optima.
         nbest = best_rows["R"].iloc[0]
         delta = nbest - best
