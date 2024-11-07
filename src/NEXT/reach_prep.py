@@ -259,7 +259,8 @@ def mk_range(low, high, N=5):
 
 
 def search_reach_coefficients(indat, arange, rrange, krange, qrange,
-                              tolerance=0.0001, validate=True, log=False,
+                              tolerance=0.0001, bias_tolerance=0.1,
+                              validate=True, log=False,
                               maxit = 100):
     """
     Searches the parameter space to identify optimal coefficients.  Returns
@@ -317,15 +318,17 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
         halt and return the new best.  Otherwise, continue.
     """
     best = -1
+    best_bias = 99
     delta = 1
+    delta_bias = 99
     its = 0
     topN = 25
     ranges = {"alpha": arange, "r": rrange, "k": krange, "q": qrange}
     fits = {k: 0 for k in ranges}
     if log:
-        history = {"alpha": [], "r": [], "k": [], "q": [], "R": []}
+        history = {"alpha": [], "r": [], "k": [], "q": [], "R": [], "bias": []}
     # False convergence is possible early on.  Give it some space.
-    while (delta > tolerance or its < 10) and its < maxit:
+    while (delta > tolerance or delta_bias > bias_tolerance or its < 10) and its < maxit:
         its += 1
         # Compute all performances.
         params = pd.DataFrame({"alpha": mk_range(*ranges["alpha"])}).\
@@ -350,6 +353,9 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
         nbest = best_rows["R"].iloc[0]
         delta = nbest - best
         best = nbest
+        nbbias = best_rows["bias"].iloc[0]
+        delta_bias = best_bias - nbbias
+        best_bias = nbbias
         for key, (low, high) in ranges.items():
             best_fits = best_rows[key]
             increments = mk_range(low, high)
@@ -392,6 +398,7 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
                 history[key].append(best_fits.iloc[0])
         if log:
             history["R"].append(best)
+            history["bias"].append(best_bias)
     best = reachperf(**fits, indat=test)
     (fits["R"], fits["bias"]) = best
     if log:
