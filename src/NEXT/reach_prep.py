@@ -310,7 +310,7 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
     2. For each variable, compute the range covered in the best 25 runs.
         If they are all on one side of the midpoint and <half are at the associated
         extreme, change the range to that side.
-        If >half are at one extreme, double the range on that side, and retract
+        If >half are towards one extreme, double the range on that side, and retract
         the other side halfway.
         If they are all in the middle, narrow the range to the middle.
         Otherwise, do not modify the range.
@@ -343,12 +343,13 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
             axis=1).abs()
         # Require relatively low absolute bias first
         # params = params[params["bias"].abs() < params["bias"].abs().quantile(0.25)]
+        params = params[(params["bias"] <= best_bias * 2) & (params["R"] >= best - 0.1)]
         params = params.sort_values("R", ascending=False)
         # Select best runs.
-        # best_rows = params.iloc[:topN].sort_values("bias")
+        best_rows = params.iloc[:topN]
         # Let's try iterating a few times to optimize for both...
-        best_rows = params.iloc[:(topN * 4)].sort_values(
-            "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
+        # best_rows = params.iloc[:(topN * 4)].sort_values(
+        #     "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
         # Quick aside: update optima.
         nbest = best_rows["R"].iloc[0]
         delta = nbest - best
@@ -365,13 +366,14 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
             if all(best_fits >= increments[2]) or all(best_fits <= increments[2]):
                 # Which side?
                 tophalf = all(best_fits >= increments[2])
-                extreme = increments[4] if tophalf else increments[0]
+                extreme = (best_fits >= increments[3]) if tophalf else\
+                    (best_fits <= increments[1])
                 if tophalf:
                     new_low = increments[2]
                 else:
                     new_high = increments[2]
                 # Extreme-weighted
-                if sum(best_fits == extreme) / topN > 0.5:
+                if sum(extreme) / topN > 0.6:
                     # Extreme-upper-weighted
                     if tophalf:
                         if high > 0:
