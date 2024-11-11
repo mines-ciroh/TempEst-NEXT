@@ -34,6 +34,7 @@ import pandas as pd
 from pygeohydro.watershed import WBD
 from pynhd.pynhd import NLDI
 import sys
+from time import sleep
 
 wbd = WBD("huc12")
 nldi = NLDI()
