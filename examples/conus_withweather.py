@@ -52,13 +52,16 @@ def list_all_inputs():
     return glob(inp_base + "HUC*")
 
 
-def build_networkf(infiles, reset=False):
+def build_networkf(infiles, reset=False, increment=False):
     # Build a network overview that we can work with.  Just maps HUC-12s to
     # their downstream watersheds, if any.
-    if reset or not os.path.exists(networkf):
+    if reset or increment or not os.path.exists(networkf):
         hucs = [get_huc(inf) for inf in infiles]
         hucs = [h for h in hucs if len(h) == 12]
         res = wbd.byids('huc12', hucs)[["huc12", "tohuc"]]
+        if increment and os.path.exists(networkf):
+            prior = pd.read_csv(networkf)
+            res = pd.concat([prior, res])
         res.to_csv(networkf, index=False)
         return res
     else:
@@ -140,6 +143,13 @@ def run_hucs(index, N=100):
     for f in dorun:
         nx.run(prepare_huc(f, network), reset=True, use_climate=False).\
             to_csv(out_base + get_huc(f) + ".csv")
+
+
+def prep_network():
+    files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
+    for ix in range(100):
+        build_networkf(get_partition(ix, files, 100), increment=True)
+        sleep(3)
             
 
 if __name__ == "__main__":
