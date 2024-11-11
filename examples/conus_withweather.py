@@ -38,14 +38,14 @@ import sys
 wbd = WBD("huc12")
 nldi = NLDI()
 
-inp_base = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/daymet_aoi/" # local machine
-# inp_base = "/scratch/dphilippus/pyproc/daymet_aoi/"  # HPC
-networkf = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/huc12network.csv" # local
-# networkf = "/scratch/dphilippus/pyproc/huc12network.csv" # HPC
-out_base = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/CONUS12/" # local
-# out_base = "/scratch/dphilippus/pyproc/CONUS12/" # HPC
-pickle = r"C:\Users\dphilippus\OneDrive - Colorado School of Mines\PhD\NEXT\next\src\NEXT\coefs.pickle" # local
-# pickle = "/u/wy/ch/dphilippus/bins/tempest-next/src/NEXT/coefs.pickle" # HPC
+# inp_base = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/daymet_aoi/" # local machine
+inp_base = "/scratch/dphilippus/pyproc/daymet_aoi/"  # HPC
+# networkf = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/huc12network.csv" # local
+networkf = "/scratch/dphilippus/pyproc/huc12network.csv" # HPC
+# out_base = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/CONUS12/" # local
+out_base = "/scratch/dphilippus/pyproc/CONUS12/" # HPC
+# pickle = r"C:\Users\dphilippus\OneDrive - Colorado School of Mines\PhD\NEXT\next\src\NEXT\coefs.pickle" # local
+pickle = "/u/wy/ch/dphilippus/bins/tempest-next/src/NEXT/coefs.pickle" # HPC
 
 def list_all_inputs():
     # List all valid input files.
