@@ -233,7 +233,7 @@ lcov_fns = {"nlcd": lcov_nlcd}
 
 # topo requirements: slope, elev_min, elev
 def topo_3dep(geom, area):
-    if area < 1e10:
+    if area < 1e8:
         dem = p3d.get_dem(geom.geometry.iloc[0], 30)
     else:
         # For larger watersheds, use lower-resolution data retrieval to keep
