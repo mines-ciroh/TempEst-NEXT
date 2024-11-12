@@ -37,6 +37,12 @@ import sys
 from time import sleep, time
 
 logalot = True
+logfile = "/u/wy/ch/dphilippus/jobs/logconus.log"
+def logger(msg, important=False):
+    if important or logalot:
+        with open(logfile, "a") as lf:
+            lf.write(msg + "\n")
+            print(msg)
 
 wbd = WBD("huc12")
 nldi = NLDI()
@@ -108,69 +114,67 @@ def proc_weather(fname):
             rename(columns={"datetime": "date"})
 
 def prepare_huc(fname, network):
-    if logalot:
-        print("Preparing HUC")
+    logger("Preparing HUC")
     # Prepare all data for a given HUC.
     huc = get_huc(fname)
     # Get contributing area and pour point
     (contrib, pour) = get_streaminfo(huc, network)
     (lon, lat) = pour.geometry[0].coords[0]
-    if logalot:
-        print("Got contributing IDs")
+    logger("Got contributing IDs")
     geoms = wbd.byids('huc12', contrib)
     # Combine all geometries into one polygon
     comb_geom = geoms.assign(id=huc).dissolve(by="id")
-    if logalot:
-        print("Got geometry")
+    logger("Got geometry")
     wpath = lambda h: inp_base + "HUC-" + h + ".csv"
     # Retrieve subwatershed weather and combine with subwatershed area
     weathers = pd.concat([proc_weather(wpath(h)).
                               assign(area = geoms[geoms['huc12'] == h]['areasqkm'].iloc[0])
                           for h in contrib
                           if os.path.exists(wpath(h))])
-    if logalot:
-        print("Got weather")
+    logger("Got weather")
     tot_area = (weathers.groupby('id')['area'].agg("first")).sum()
     # Area-weighted mean
-    weather = weathers.drop(columns='id').groupby('date').apply(
-        lambda x: x * x['area'] / tot_area).assign(id=huc)
+    wdate = weathers["date"]
+    weather = weathers.drop(columns=["id", "date"]).apply(
+        lambda x: x * x['area'] / tot_area, axis=1).\
+                assign(id=huc, date=wdate).\
+                groupby(["id", "date"], as_index=False).\
+                sum()
     weather['area'] = tot_area * 1e6  # sqkm --> sqm
     weather['lat'] = lat
     weather['lon'] = lon
-    if logalot:
-        print("Finalized weather")
+    logger("Finalized weather")
     # Retrieve required land cover and topo
     lcov = data.lcov_nlcd(comb_geom, 1, 1)
-    if logalot:
-        print("Got land cover")
+    logger("Got land cover")
     topo = data.topo_3dep(comb_geom, tot_area * 1e6)
-    if logalot:
-        print("Got topo")
+    logger("Got topo")
     general_statics = pd.DataFrame(lcov | topo, index = [0])
     # And return the whole enchilada
     res = weather.merge(general_statics, how="cross")
-    if logalot:
-        print("Finished data prep, starting model run")
+    logger("Finished data prep, starting model run")
     return res
 
 
 def run_hucs(index, N=100):
+    logger("Starting HUCs run")
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
     network = build_networkf(files)
+    logger("Got files and network")
     dorun = get_partition(index, files, N)
     nx = NEXT.from_pickle(pickle)
+    logger("Built NEXT model")
     start = time()
     for f in dorun:
-        if logalot:
-            print(f"Running: {get_huc(f)}")
+        logger(f"Running: {get_huc(f)}")
         try:
             instart = time()
             nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
                 to_csv(out_base + get_huc(f) + ".csv")
-            print(f"Ran one watershed in {(time() - start):.0f} seconds")
+            logger(f"Ran one watershed in {(time() - start):.0f} seconds", True)
         except Exception as e:
-            print(f"Failed file {f} with error {e}.")
-    print(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes")
+            logger(f"Failed file {f} with error {e}.", True)
+    logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
 
 
 def prep_network(resume=0):
@@ -182,9 +186,11 @@ def prep_network(resume=0):
             
 
 if __name__ == "__main__":
+    logger("Running the thing")
     if len(sys.argv) == 3:
         index = int(sys.argv[1])
         N = int(sys.argv[2])
+        logger("Running HUCs")
         run_hucs(index, N)
     else:
         print("Usage: python conus_withweather.py <index> <N>")
