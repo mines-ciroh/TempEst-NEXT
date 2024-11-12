@@ -36,7 +36,7 @@ from pynhd.pynhd import NLDI
 import sys
 from time import sleep, time
 
-logalot = True
+logalot = False
 logfile = "/u/wy/ch/dphilippus/jobs/logconus.log"
 def logger(msg, important=False):
     if important or logalot:
@@ -170,8 +170,8 @@ def run_hucs(index, N=100):
         try:
             instart = time()
             nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
-                to_csv(out_base + get_huc(f) + ".csv")
-            logger(f"Ran one watershed in {(time() - start):.0f} seconds", True)
+                to_csv(out_base + get_huc(f) + ".csv", index=False)
+            logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
             logger(f"Failed file {f} with error {e}.", True)
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
