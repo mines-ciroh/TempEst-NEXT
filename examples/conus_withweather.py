@@ -171,7 +171,7 @@ def run_hucs(index, N=100, catchup=False):
         logger(f"Running: {get_huc(f)}")
         try:
             output = out_base + get_huc(f) + ".csv"
-            if not (catchup and os.path.exists(output)):
+            if not os.path.exists(output):
                 instart = time()
                 nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
                     to_csv(output, index=False)
