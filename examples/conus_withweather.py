@@ -36,6 +36,8 @@ from pynhd.pynhd import NLDI
 import sys
 from time import sleep, time
 
+logalot = True
+
 wbd = WBD("huc12")
 nldi = NLDI()
 
@@ -106,20 +108,28 @@ def proc_weather(fname):
             rename(columns={"datetime": "date"})
 
 def prepare_huc(fname, network):
+    if logalot:
+        print("Preparing HUC")
     # Prepare all data for a given HUC.
     huc = get_huc(fname)
     # Get contributing area and pour point
     (contrib, pour) = get_streaminfo(huc, network)
     (lon, lat) = pour.geometry[0].coords[0]
+    if logalot:
+        print("Got contributing IDs")
     geoms = wbd.byids('huc12', contrib)
     # Combine all geometries into one polygon
     comb_geom = geoms.assign(id=huc).dissolve(by="id")
+    if logalot:
+        print("Got geometry")
     wpath = lambda h: inp_base + "HUC-" + h + ".csv"
     # Retrieve subwatershed weather and combine with subwatershed area
     weathers = pd.concat([proc_weather(wpath(h)).
                               assign(area = geoms[geoms['huc12'] == h]['areasqkm'].iloc[0])
                           for h in contrib
                           if os.path.exists(wpath(h))])
+    if logalot:
+        print("Got weather")
     tot_area = (weathers.groupby('id')['area'].agg("first")).sum()
     # Area-weighted mean
     weather = weathers.drop(columns='id').groupby('date').apply(
@@ -127,13 +137,21 @@ def prepare_huc(fname, network):
     weather['area'] = tot_area * 1e6  # sqkm --> sqm
     weather['lat'] = lat
     weather['lon'] = lon
+    if logalot:
+        print("Finalized weather")
     # Retrieve required land cover and topo
-    general_statics = pd.DataFrame(
-        data.lcov_nlcd(comb_geom, 1, 1) |
-        data.topo_3dep(comb_geom, tot_area * 1e6),
-                       index = [0])
+    lcov = data.lcov_nlcd(comb_geom, 1, 1)
+    if logalot:
+        print("Got land cover")
+    topo = data.topo_3dep(comb_geom, tot_area * 1e6)
+    if logalot:
+        print("Got topo")
+    general_statics = pd.DataFrame(lcov | topo, index = [0])
     # And return the whole enchilada
-    return weather.merge(general_statics, how="cross")
+    res = weather.merge(general_statics, how="cross")
+    if logalot:
+        print("Finished data prep, starting model run")
+    return res
 
 
 def run_hucs(index, N=100):
@@ -143,9 +161,11 @@ def run_hucs(index, N=100):
     nx = NEXT.from_pickle(pickle)
     start = time()
     for f in dorun:
+        if logalot:
+            print(f"Running: {get_huc(f)}")
         try:
             instart = time()
-            nx.run(prepare_huc(f, network), reset=True, use_climate=False).\
+            nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
                 to_csv(out_base + get_huc(f) + ".csv")
             print(f"Ran one watershed in {(time() - start):.0f} seconds")
         except Exception as e:
