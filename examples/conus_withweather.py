@@ -156,22 +156,26 @@ def prepare_huc(fname, network):
     return res
 
 
-def run_hucs(index, N=100):
+def run_hucs(index, N=100, catchup=False):
+    # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
+    # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     logger("Starting HUCs run")
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
     network = build_networkf(files)
     logger("Got files and network")
-    dorun = get_partition(index, files, N)
+    dorun = get_partition(index, files, N) if not catchup else files
     nx = NEXT.from_pickle(pickle)
     logger("Built NEXT model")
     start = time()
     for f in dorun:
         logger(f"Running: {get_huc(f)}")
         try:
-            instart = time()
-            nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
-                to_csv(out_base + get_huc(f) + ".csv", index=False)
-            logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
+            output = out_base + get_huc(f) + ".csv"
+            if not (catchup and os.path.exists(output)):
+                instart = time()
+                nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
+                    to_csv(output, index=False)
+                logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
             logger(f"Failed file {f} with error {e}.", True)
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
@@ -192,5 +196,8 @@ if __name__ == "__main__":
         N = int(sys.argv[2])
         logger("Running HUCs")
         run_hucs(index, N)
+    elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
+        logger("Running catchup")
+        run_hucs(0, 100, True)
     else:
         print("Usage: python conus_withweather.py <index> <N>")
