@@ -34,7 +34,7 @@ import pandas as pd
 from pygeohydro.watershed import WBD
 from pynhd.pynhd import NLDI
 import sys
-from time import sleep
+from time import sleep, time
 
 wbd = WBD("huc12")
 nldi = NLDI()
@@ -61,12 +61,12 @@ def build_networkf(infiles, reset=False, increment=False):
         hucs = [h for h in hucs if len(h) == 12]
         res = wbd.byids('huc12', hucs)[["huc12", "tohuc"]]
         if increment and os.path.exists(networkf):
-            prior = pd.read_csv(networkf)
+            prior = pd.read_csv(networkf, dtype={"huc12": "str", "tohuc": "str"})
             res = pd.concat([prior, res])
         res.to_csv(networkf, index=False)
         return res
     else:
-        return pd.read_csv(networkf)
+        return pd.read_csv(networkf, dtype={"huc12": "str", "tohuc": "str"})
     
 
 def get_streaminfo(huc, network):
@@ -117,12 +117,12 @@ def prepare_huc(fname, network):
     wpath = lambda h: inp_base + "HUC-" + h + ".csv"
     # Retrieve subwatershed weather and combine with subwatershed area
     weathers = pd.concat([proc_weather(wpath(h)).
-                              assign(area = geoms[geoms['huc12' == h]]['areasqkm'].iloc[0])
+                              assign(area = geoms[geoms['huc12'] == h]['areasqkm'].iloc[0])
                           for h in contrib
-                          if os.path.exists(h)])
+                          if os.path.exists(wpath(h))])
     tot_area = (weathers.groupby('id')['area'].agg("first")).sum()
     # Area-weighted mean
-    weather = weathers.drop(columns='id').groupby('datetime').apply(
+    weather = weathers.drop(columns='id').groupby('date').apply(
         lambda x: x * x['area'] / tot_area).assign(id=huc)
     weather['area'] = tot_area * 1e6  # sqkm --> sqm
     weather['lat'] = lat
@@ -141,16 +141,24 @@ def run_hucs(index, N=100):
     network = build_networkf(files)
     dorun = get_partition(index, files, N)
     nx = NEXT.from_pickle(pickle)
+    start = time()
     for f in dorun:
-        nx.run(prepare_huc(f, network), reset=True, use_climate=False).\
-            to_csv(out_base + get_huc(f) + ".csv")
+        try:
+            instart = time()
+            nx.run(prepare_huc(f, network), reset=True, use_climate=False).\
+                to_csv(out_base + get_huc(f) + ".csv")
+            print(f"Ran one watershed in {(time() - start):.0f} seconds")
+        except Exception as e:
+            print(f"Failed file {f} with error {e}.")
+    print(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes")
 
 
-def prep_network():
+def prep_network(resume=0):
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
-    for ix in range(100):
+    for ix in range(resume, 100):
         build_networkf(get_partition(ix, files, 100), increment=True)
-        sleep(3)
+        print(ix)
+        sleep(1)
             
 
 if __name__ == "__main__":
