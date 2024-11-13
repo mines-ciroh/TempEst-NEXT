@@ -113,7 +113,7 @@ def proc_weather(fname):
             reset_index().\
             rename(columns={"datetime": "date"})
 
-def prepare_huc(fname, network):
+def prepare_huc(fname, network, small):
     logger("Preparing HUC")
     # Prepare all data for a given HUC.
     huc = get_huc(fname)
@@ -121,6 +121,8 @@ def prepare_huc(fname, network):
     (contrib, pour) = get_streaminfo(huc, network)
     (lon, lat) = pour.geometry[0].coords[0]
     logger("Got contributing IDs")
+    if small and len(contrib) > 10:
+        return None
     geoms = wbd.byids('huc12', contrib)
     # Combine all geometries into one polygon
     comb_geom = geoms.assign(id=huc).dissolve(by="id")
@@ -156,9 +158,10 @@ def prepare_huc(fname, network):
     return res
 
 
-def run_hucs(index, N=100, catchup=False):
+def run_hucs(index, N=100, catchup=False, small=False):
     # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
+    # `small` flag only runs sites with <10 contributing HUCs.
     logger("Starting HUCs run")
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
     network = build_networkf(files)
@@ -173,9 +176,11 @@ def run_hucs(index, N=100, catchup=False):
             output = out_base + get_huc(f) + ".csv"
             if not os.path.exists(output):
                 instart = time()
-                nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod"]].\
-                    to_csv(output, index=False)
-                logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
+                prep = prepare_huc(f, network, small)
+                if prep is not None:
+                    nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod", "area"]].\
+                        to_csv(output, index=False)
+                    logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
             logger(f"Failed file {f} with error {e}.", True)
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
@@ -191,11 +196,12 @@ def prep_network(resume=0):
 
 if __name__ == "__main__":
     logger("Running the thing")
-    if len(sys.argv) == 3:
+    if len(sys.argv) >= 3:
         index = int(sys.argv[1])
         N = int(sys.argv[2])
-        logger("Running HUCs")
-        run_hucs(index, N)
+        small = sys.argv[3] == "small" if len(sys.argv) == 4 else False
+        logger(f"Running HUCs; small is {small}")
+        run_hucs(index, N, catchup=False, small=small)
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
         run_hucs(0, 100, True)
