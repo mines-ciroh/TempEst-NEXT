@@ -178,7 +178,7 @@ def run_hucs(index, N=100, catchup=False, small=False):
                 instart = time()
                 prep = prepare_huc(f, network, small)
                 if prep is not None:
-                    nx.run(prepare_huc(f, network), reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod", "area"]].\
+                    nx.run(prep, reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod", "area"]].\
                         to_csv(output, index=False)
                     logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
@@ -200,7 +200,7 @@ if __name__ == "__main__":
         index = int(sys.argv[1])
         N = int(sys.argv[2])
         small = sys.argv[3] == "small" if len(sys.argv) == 4 else False
-        logger(f"Running HUCs; small is {small}")
+        logger(f"Running HUCs; small is {small}", small)
         run_hucs(index, N, catchup=False, small=small)
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
