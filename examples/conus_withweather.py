@@ -121,7 +121,7 @@ def prepare_huc(fname, network, small):
     (contrib, pour) = get_streaminfo(huc, network)
     (lon, lat) = pour.geometry[0].coords[0]
     logger("Got contributing IDs")
-    if small and len(contrib) > 10:
+    if small is not None and len(contrib) > small:
         return None
     geoms = wbd.byids('huc12', contrib)
     # Combine all geometries into one polygon
@@ -158,7 +158,7 @@ def prepare_huc(fname, network, small):
     return res
 
 
-def run_hucs(index, N=100, catchup=False, small=False):
+def run_hucs(index, N=100, catchup=False, small=None):
     # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     # `small` flag only runs sites with <10 contributing HUCs.
@@ -199,11 +199,11 @@ if __name__ == "__main__":
     if len(sys.argv) >= 3:
         index = int(sys.argv[1])
         N = int(sys.argv[2])
-        small = sys.argv[3] == "small" if len(sys.argv) == 4 else False
+        small = int(sys.argv[3]) if len(sys.argv) == 4 else None
         logger(f"Running HUCs; small is {small}", small)
         run_hucs(index, N, catchup=False, small=small)
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
         run_hucs(0, 100, True)
     else:
-        print("Usage: python conus_withweather.py <index> <N>")
+        print("Usage: python conus_withweather.py <index> <N> [max size]")
