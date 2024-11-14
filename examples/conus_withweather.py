@@ -53,6 +53,7 @@ inp_base = "/scratch/dphilippus/pyproc/daymet_aoi/"  # HPC
 networkf = "/scratch/dphilippus/pyproc/huc12network.csv" # HPC
 # out_base = "X:/Rio.Data/StreamTemperature/NEXT/ReadyData/CONUS12/" # local
 out_base = "/scratch/dphilippus/pyproc/CONUS12/" # HPC
+out_raw_base = "/scratch/dphilippus/pyproc/CONUS12Inputs/" # HPC
 # pickle = r"C:\Users\dphilippus\OneDrive - Colorado School of Mines\PhD\NEXT\next\src\NEXT\coefs.pickle" # local
 pickle = "/u/wy/ch/dphilippus/bins/tempest-next/src/NEXT/coefs.pickle" # HPC
 
@@ -174,10 +175,16 @@ def run_hucs(index, N=100, catchup=False, small=None):
         logger(f"Running: {get_huc(f)}")
         try:
             output = out_base + get_huc(f) + ".csv"
+            raw = out_raw_base + get_huc(f) + ".csv"
             if not os.path.exists(output):
                 instart = time()
-                prep = prepare_huc(f, network, small)
+                if os.path.exists(raw):
+                    prep = pd.read_csv(raw, dtype={"id": "str"}, parse_dates=["date"])
+                else:
+                    prep = prepare_huc(f, network, small)
                 if prep is not None:
+                    if not os.path.exists(raw):
+                        prep.to_csv(out_raw_base + get_huc(f) + ".csv", index=False)
                     nx.run(prep, reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod", "area"]].\
                         to_csv(output, index=False)
                     logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
