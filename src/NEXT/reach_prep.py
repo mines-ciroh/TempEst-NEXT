@@ -198,7 +198,7 @@ def monoreach_maker(alpha, r, k, q):
     def delta(indat):
         return (indat["tmax"] - indat["tmod"]) * (
             1 - np.exp(-alpha / (indat["Q"] ** q))) + (
-                r * indat["srad"] + k) / (indat["Q"] ** q)
+                r * indat["srad"]) / (indat["Q"] ** q) + k
     return delta
 
 
