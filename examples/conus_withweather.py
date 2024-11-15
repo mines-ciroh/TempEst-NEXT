@@ -56,6 +56,7 @@ out_base = "/scratch/dphilippus/pyproc/CONUS12/" # HPC
 out_raw_base = "/scratch/dphilippus/pyproc/CONUS12Inputs/" # HPC
 # pickle = r"C:\Users\dphilippus\OneDrive - Colorado School of Mines\PhD\NEXT\next\src\NEXT\coefs.pickle" # local
 pickle = "/u/wy/ch/dphilippus/bins/tempest-next/src/NEXT/coefs.pickle" # HPC
+bad_id = "errors.txt"
 
 def list_all_inputs():
     # List all valid input files.
@@ -164,7 +165,12 @@ def run_hucs(index, N=100, catchup=False, small=None, skip=0):
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     # `small` flag only runs sites with <10 contributing HUCs.
     logger("Starting HUCs run")
-    files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
+    if os.path.exists(bad_id):
+        with open(bad_id, "r") as f:
+            bad_hucs = [x.strip() for x in f.readlines()]
+    else:
+        bad_hucs = []
+    files = [f for f in list_all_inputs() if len(get_huc(f)) == 12 and get_huc(f) not in bad_hucs]
     if skip >= len(files) // N:
         return None
     network = build_networkf(files)
@@ -192,6 +198,8 @@ def run_hucs(index, N=100, catchup=False, small=None, skip=0):
                     logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
             logger(f"Failed file {f} with error {e}; took {(time() - instart):.0f} seconds.", True)
+            with open(bad_id, "a") as file:
+                file.write(get_huc(f) + "\n")
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
 
 

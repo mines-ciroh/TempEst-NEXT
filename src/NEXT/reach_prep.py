@@ -229,7 +229,7 @@ def reachperf(alpha, r, k, q, indat):
     """
     dmod = monoreach_maker(alpha, r, k, q)(indat)
     dobs = indat["delta"]
-    return (dobs.corr(dmod), (dmod - dobs).mean())
+    return (dobs.corr(dmod), (dmod - dobs).mean(), np.sqrt(((dmod - dobs)**2).mean()))
 
 
 def mk_range(low, high, N=5):
@@ -317,14 +317,14 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
     3. Rerun the test. If the new best is <tolerance better than the old best,
         halt and return the new best.  Otherwise, continue.
     """
-    best = 1
-    delta = 1
+    best = 10
+    delta = 10
     its = 0
     topN = 25
     ranges = {"alpha": arange, "r": rrange, "k": krange, "q": qrange}
     fits = {k: 0 for k in ranges}
     if log:
-        history = {"alpha": [], "r": [], "k": [], "q": [], "R": [], "bias": [],
+        history = {"alpha": [], "r": [], "k": [], "q": [], "R": [], "bias": [], "rmse": [],
                    "score": []}
     # False convergence is possible early on.  Give it some space.
     while (delta > tolerance or its < 20) and its < maxit:
@@ -340,19 +340,22 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
         params["bias"] = params.apply(
             lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train)[1],
             axis=1).abs()
+        params["rmse"] = params.apply(
+            lambda x: reachperf(x["alpha"], x["r"], x["k"], x["q"], train)[2],
+            axis=1)
         # bias of 10 C = as bad as R of 0; closer to 0 is better
-        params["score"] = np.sqrt((1-params["R"])**2 + (params["bias"]/10)**2)
+        params["score"] = np.sqrt((1-params["R"])**2 + (params["bias"]/10)**2 + (params["rmse"])**2)
         # Require relatively low absolute bias first
         # params = params[params["bias"].abs() < params["bias"].abs().quantile(0.25)]
         # params = params[(params["bias"] <= best_bias * 2) & (params["R"] >= best - 0.1)]
-        params = params.sort_values("score")
+        params = params.sort_values("rmse")
         # Select best runs.
         best_rows = params.iloc[:topN]
         # Let's try iterating a few times to optimize for both...
         # best_rows = params.iloc[:(topN * 4)].sort_values(
         #     "bias").iloc[:(topN * 2)].sort_values("R", ascending=False).iloc[:topN]
         # Quick aside: update optima.
-        nbest = best_rows["score"].iloc[0]
+        nbest = best_rows["rmse"].iloc[0]
         delta = best - nbest
         best = nbest
         for key, (low, high) in ranges.items():
@@ -399,9 +402,10 @@ def search_reach_coefficients(indat, arange, rrange, krange, qrange,
         if log:
             history["R"].append(best_rows["R"].iloc[0])
             history["bias"].append(best_rows["bias"].iloc[0])
+            history["rmse"].append(best_rows["rmse"].iloc[0])
             history["score"].append(best)
     best = reachperf(**fits, indat=test)
-    (fits["R"], fits["bias"]) = best
+    (fits["R"], fits["bias"], fits["rmse"]) = best
     if log:
         return (fits, pd.DataFrame(history))
     else:
