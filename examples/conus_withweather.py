@@ -159,25 +159,27 @@ def prepare_huc(fname, network, small):
     return res
 
 
-def run_hucs(index, N=100, catchup=False, small=None):
+def run_hucs(index, N=100, catchup=False, small=None, skip=0):
     # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     # `small` flag only runs sites with <10 contributing HUCs.
     logger("Starting HUCs run")
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12]
+    if skip >= len(files) // N:
+        return None
     network = build_networkf(files)
     logger("Got files and network")
-    dorun = get_partition(index, files, N) if not catchup else files
+    dorun = get_partition(index, files, N)[skip:] if not catchup else files
     nx = NEXT.from_pickle(pickle)
     logger("Built NEXT model")
     start = time()
     for f in dorun:
         logger(f"Running: {get_huc(f)}")
+        instart = time()
         try:
             output = out_base + get_huc(f) + ".csv"
             raw = out_raw_base + get_huc(f) + ".csv"
             if not os.path.exists(output):
-                instart = time()
                 if os.path.exists(raw):
                     prep = pd.read_csv(raw, dtype={"id": "str"}, parse_dates=["date"])
                 else:
@@ -189,7 +191,7 @@ def run_hucs(index, N=100, catchup=False, small=None):
                         to_csv(output, index=False)
                     logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
         except Exception as e:
-            logger(f"Failed file {f} with error {e}.", True)
+            logger(f"Failed file {f} with error {e}; took {(time() - instart):.0f} seconds.", True)
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
 
 
@@ -206,11 +208,12 @@ if __name__ == "__main__":
     if len(sys.argv) >= 3:
         index = int(sys.argv[1])
         N = int(sys.argv[2])
-        small = int(sys.argv[3]) if len(sys.argv) == 4 else None
-        logger(f"Running HUCs; small is {small}", small)
-        run_hucs(index, N, catchup=False, small=small)
+        small = int(sys.argv[3]) if len(sys.argv) >= 4 else None
+        skip = int(sys.argv[4]) if len(sys.argv) >= 5 else 0
+        logger(f"Running HUCs; small is {small}; skipping {skip}", small)
+        run_hucs(index, N, catchup=False, small=small, skip=(skip // N))
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
         run_hucs(0, 100, True)
     else:
-        print("Usage: python conus_withweather.py <index> <N> [max size]")
+        print("Usage: python conus_withweather.py <index> <N> [max size] [no. to skip]")
