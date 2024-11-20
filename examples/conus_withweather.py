@@ -35,6 +35,11 @@ from pygeohydro.watershed import WBD
 from pynhd.pynhd import NLDI
 import sys
 from time import sleep, time
+import signal
+
+def handler(x, y):
+    raise Exception("Timer expired")
+signal.signal(signal.SIGALRM, handler)
 
 logalot = False
 logfile = "/u/wy/ch/dphilippus/jobs/logconus.log"
@@ -166,11 +171,12 @@ def prepare_huc(fname, network, small):
     return res
 
 
-def run_hucs(index, N=100, catchup=False, small=None, skip=0):
+def run_hucs(index, N=100, catchup=False, small=None, skip=0, timelimit=300):
     # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     # `small` flag only runs sites with <10 contributing HUCs.
     logger("Starting HUCs run")
+    start = time()
     if os.path.exists(bad_id):
         with open(bad_id, "r") as f:
             bad_hucs = [x.strip() for x in f.readlines()]
@@ -183,19 +189,18 @@ def run_hucs(index, N=100, catchup=False, small=None, skip=0):
     files = [f for f in list_all_inputs() if len(get_huc(f)) == 12 and get_huc(f) not in (bad_hucs + existing)]
     if skip >= len(files) // N:
         return None
-    start = time()
     network = build_networkf(files)
     dorun = get_partition(index, files, N)[skip:] if not catchup else files
-    logger(f"Got files and network; took {(time() - start):.0f} seconds.  Attempting {len(dorun)} HUCs; ignored {len(bad_hucs)} errors and {len(existing)} already run.", True)
     nx = NEXT.from_pickle(pickle)
-    logger("Built NEXT model")
+    logger(f"Prepared run; took {(time() - start):.0f} seconds.  Attempting {len(dorun)} HUCs; ignored {len(bad_hucs)} errors and {len(existing)} already run.", True)
+    instart = time()
     for f in dorun:
-        logger(f"Running: {get_huc(f)}")
-        instart = time()
         try:
             output = out_base + get_huc(f) + ".csv"
             raw = out_raw_base + get_huc(f) + ".csv"
             if not os.path.exists(output):
+                if timelimit > 0:
+                    signal.alarm(timelimit)
                 if os.path.exists(raw):
                     prep = pd.read_csv(raw, dtype={"id": "str"}, parse_dates=["date"])
                 else:
@@ -205,11 +210,12 @@ def run_hucs(index, N=100, catchup=False, small=None, skip=0):
                         prep.to_csv(out_raw_base + get_huc(f) + ".csv", index=False)
                     nx.run(prep, reset=True, use_climate=False)[["id", "lat", "lon", "date", "temp.mod", "area"]].\
                         to_csv(output, index=False)
-                    logger(f"Ran one watershed in {(time() - instart):.0f} seconds", True)
+                    logger(f"Ran: {get_huc(f)}. Total run-to-run time: {(time() - instart):.0f} seconds", True)
         except Exception as e:
-            logger(f"Failed file {f} with error {e}; took {(time() - instart):.0f} seconds.", True)
+            logger(f"Failed: {get_huc(f)} with error {e}. Total run-to-run time: {(time() - instart):.0f} seconds.", True)
             with open(bad_id, "a") as file:
                 file.write(get_huc(f) + "\n")
+        instart = time()
     logger(f"Ran {len(f)} watersheds in {(time() - start)/60:.0f} minutes", True)
 
 
@@ -228,7 +234,7 @@ if __name__ == "__main__":
         N = int(sys.argv[2])
         small = int(sys.argv[3]) if len(sys.argv) >= 4 else None
         skip = int(sys.argv[4]) if len(sys.argv) >= 5 else 0
-        logger(f"Running HUCs; small is {small}; skipping {skip}", small)
+        logger(f"Running HUCs; small is {small}; skipping {skip}", False)
         run_hucs(index, N, catchup=False, small=small, skip=(skip // N))
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
