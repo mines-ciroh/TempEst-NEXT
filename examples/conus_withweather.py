@@ -57,11 +57,11 @@ out_raw_base = "/scratch/dphilippus/pyproc/CONUS12Inputs/" # HPC
 # pickle = r"C:\Users\dphilippus\OneDrive - Colorado School of Mines\PhD\NEXT\next\src\NEXT\coefs.pickle" # local
 pickle = "/u/wy/ch/dphilippus/bins/tempest-next/src/NEXT/coefs.pickle" # HPC
 bad_id = "errors.txt"
+hasrun = "hucs.txt"
 
 def list_all_inputs():
     # List all valid input files.
     return glob(inp_base + "HUC*")
-
 
 def build_networkf(infiles, reset=False, increment=False):
     # Build a network overview that we can work with.  Just maps HUC-12s to
@@ -104,6 +104,12 @@ def get_huc(fname):
     # Extract HUC-code from file path
     last = fname.split("HUC-")[-1]  # after the HUC
     return last.split(".")[0]  # before the .csv
+
+
+def list_hucs():
+    existing = [get_huc(f) for f in os.listdir(out_base)]
+    with open(hasrun, "w") as f:
+        f.write("\n".join(existing))
 
 
 def proc_weather(fname):
@@ -170,15 +176,19 @@ def run_hucs(index, N=100, catchup=False, small=None, skip=0):
             bad_hucs = [x.strip() for x in f.readlines()]
     else:
         bad_hucs = []
-    files = [f for f in list_all_inputs() if len(get_huc(f)) == 12 and get_huc(f) not in bad_hucs]
+    existing = []
+    if os.path.exists(hasrun):
+        with open(hasrun, "r") as f:
+            existing = [x.strip() for x in f]
+    files = [f for f in list_all_inputs() if len(get_huc(f)) == 12 and get_huc(f) not in (bad_hucs + existing)]
     if skip >= len(files) // N:
         return None
+    start = time()
     network = build_networkf(files)
-    logger("Got files and network")
     dorun = get_partition(index, files, N)[skip:] if not catchup else files
+    logger(f"Got files and network; took {(time() - start):.0f} seconds.  Attempting {len(dorun)} HUCs; ignored {len(bad_hucs)} errors and {len(existing)} already run.", True)
     nx = NEXT.from_pickle(pickle)
     logger("Built NEXT model")
-    start = time()
     for f in dorun:
         logger(f"Running: {get_huc(f)}")
         instart = time()
@@ -223,5 +233,8 @@ if __name__ == "__main__":
     elif len(sys.argv) == 2 and sys.argv[1] == "catchup":
         logger("Running catchup")
         run_hucs(0, 100, True)
+    elif len(sys.argv) == 2 and sys.argv[1] == "list":
+        # Generate a list of HUCs that have been run and can be skipped.
+        list_hucs()
     else:
         print("Usage: python conus_withweather.py <index> <N> [max size] [no. to skip]")
