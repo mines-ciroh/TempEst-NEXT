@@ -32,6 +32,7 @@ import xrspatial
 import numpy as np
 import geopandas as gpd
 import shapely as shp
+import NEXT.wforecast as wfc
 
 tid = "10343500"
 nldi = NLDI()
@@ -170,7 +171,7 @@ def merit_geom(merit_id):
 geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom,
             "coordinates": watershed_geom}
 
-# Weather requirements: tmax, prcp, srad, vp
+# Weather requirements: date, tmax, prcp, srad, vp
 wvars = ["tmax", "prcp", "srad", "vp"]
 def weather_daymet(geom, start, end):
     return dym.get_bygeom(geom.geometry.iloc[0], (start, end),
@@ -183,8 +184,25 @@ def weather_nldas(geom, start, end):
     # Can't do srad, bit of a problem
     pass
 
+
+hrrr_varnames = {
+    "TMP": ("tmax", lambda x: x.max()),
+    "PRATE": ("prcp", lambda x: x.sum()),  # needs double-checking
+    "SFCR": ("srad", lambda x: x.mean())  # guessing that's sfc rad?
+    # "something": ("something", lambda x: x.mean())  # humidity??
+    }
+
 def weather_hrrr(geom, start, end):
-    pass
+    start = np.datetime64(start)
+    end = np.datetime64(end)
+    dates = pd.Series(np.arange(start, end + np.timedelta64(1, "D")))
+    date_str = dates.dt.strftime("%Y%m%d")
+    return pd.concat([
+        wfc.hrrr_series(geom, date_str, var,
+                        hrrr_varnames[var][0],
+                        hrrr_varnames[var][1])
+        for var in hrrr_varnames
+        ], axis=1)
 
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
                "hrrr": weather_hrrr}
