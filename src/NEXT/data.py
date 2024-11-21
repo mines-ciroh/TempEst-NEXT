@@ -206,8 +206,7 @@ def weather_hrrr(geom, start, end):
 
 
 def weather_gfs(geom, start, end):
-    res = wfc.get_gfs(geom, start)
-    return res[res["date"] <= pd.to_datetime(end)]
+    return wfc.get_gfs(geom, start)
 
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
                "hrrr": weather_hrrr, "gfs": weather_gfs}
