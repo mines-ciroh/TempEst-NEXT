@@ -113,7 +113,7 @@ def get_gfs(basin, date, varbs=["tmp2m", "spfh2m", "dswrfsfc", "pratesfc"],
     # Now pull all the data.
     raw = pd.DataFrame([get_gfs_timestep(fcst, time, lat, lon, varbs)
                          for time in steps]).rename(columns=renamer)
-    raw["date"] = pd.to_datetime(raw["time"]).dt.date
+    raw["date"] = pd.to_datetime(raw["time"]).normalize()
     return raw.groupby("date", as_index=False)[new_names].agg(operators)
     
 
