@@ -204,8 +204,13 @@ def weather_hrrr(geom, start, end):
         for var in hrrr_varnames
         ], axis=1)
 
+
+def weather_gfs(geom, start, end):
+    res = wfc.get_gfs(geom, start)
+    return res[res["date"] <= end]
+
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
-               "hrrr": weather_hrrr}
+               "hrrr": weather_hrrr, "gfs": weather_gfs}
 
 # lcov requirements: forest, wetland, developed, ice_snow, water
 def lcov_nlcd(geom, start, end):
