@@ -171,7 +171,7 @@ def prepare_huc(fname, network, small):
     return res
 
 
-def run_hucs(index, N=100, catchup=False, small=None, skip=0, timelimit=300):
+def run_hucs(index, N=100, catchup=False, small=None, skip=0, timelimit=150):
     # Iterate through specified HUCs and run them.  Catchup flag can be used to return to watersheds that crashed,
     # especially if it was because of out-of-memory errors (i.e., run one big job with more memory allowed).
     # `small` flag only runs sites with <10 contributing HUCs.
