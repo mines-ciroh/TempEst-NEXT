@@ -105,8 +105,8 @@ def expand_line(line, resolution):
         steps = np.arange(resolution, line.length, resolution)
     return gpd.GeoSeries(line.interpolate(steps))
 
-def expand_lines(geometry):
-    return pd.concat([expand_line(g) for g in geometry])
+def expand_lines(geometry, resolution):
+    return pd.concat([expand_line(g, resolution) for g in geometry])
 
 
 def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
@@ -116,7 +116,7 @@ def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
     model = NEXT.NEXT.from_pickle(pickle)
     lines = nldi.navigate_byloc(coords, "upstreamTributaries",
                                 source="flowlines", distance=dist)
-    points = expand_lines(lines.geometry)
+    points = expand_lines(lines.geometry, resolution)
     clist = [pt.coords[0] for pt in points]
     return [
         lambda: (run_forecast(model, f"{x}:{y}", basepath))
