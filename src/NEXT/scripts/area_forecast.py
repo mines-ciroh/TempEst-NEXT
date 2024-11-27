@@ -145,6 +145,10 @@ if __name__ == "__main__":
                 run()
             except Exception as e:
                 print(e)
+                try:
+                    run()
+                except:
+                    pass
     else:
         print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000]
     Runs nested watershed forecasts upstream of the specified gage.
