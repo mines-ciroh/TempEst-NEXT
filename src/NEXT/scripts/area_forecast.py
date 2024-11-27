@@ -49,7 +49,7 @@ def get_statics(site, basepath):
 
 
 def prepare_model(model, site, basepath):
-    dpath = prep_name(site)
+    dpath = prep_name(site, basepath)
     if os.path.exists(dpath):
         ws_data = pd.read_csv(dpath, dtype={"id": "str"}, parse_dates=["date"])
     else:
