@@ -16,6 +16,7 @@ import geopandas as gpd
 import numpy as np
 import datetime
 from pynhd import NLDI
+import sys
 nldi = NLDI()
 
 def fix_sitename(site):
@@ -122,4 +123,31 @@ def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
         (lambda x, y: (lambda: run_forecast(model, f"{x}:{y}", basepath)))(a, b)
         for (a, b) in clist
         ]
+
+
+if __name__ == "__main__":
+    args = sys.argv
+    if len(args) >= 3:
+        end_id = args[1]
+        basepath = args[2]
+        index = int(args[3]) if len(args) >= 4 else 0
+        N = int(args[4]) if len(args) >= 5 else 1
+        res = float(args[5]) if len(args) >= 6 else 0.01
+        dist = int(args[6]) if len(args) >= 7 else 1000
+        runs = run_forecasts(end_id, "coefs.pickle", basepath, res, dist)
+        if N > 1:
+            total = len(runs)
+            dorun = runs[index:total:N]
+        else:
+            dorun = runs
+        for run in dorun:
+            try:
+                run()
+            except Exception as e:
+                print(e)
+    else:
+        print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000]
+    Runs nested watershed forecasts upstream of the specified gage.
+    After completing a run, switch to the Notebook to quickly retrieve all
+    runs.""")
 
