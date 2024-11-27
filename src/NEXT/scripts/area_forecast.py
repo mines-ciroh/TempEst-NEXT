@@ -119,7 +119,7 @@ def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
     points = expand_lines(lines.geometry, resolution)
     clist = [pt.coords[0] for pt in points]
     return [
-        lambda x, y: (lambda: run_forecast(model, f"{x}:{y}", basepath))(a, b)
+        (lambda x, y: (lambda: run_forecast(model, f"{x}:{y}", basepath)))(a, b)
         for (a, b) in clist
         ]
 
