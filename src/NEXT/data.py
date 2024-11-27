@@ -278,20 +278,25 @@ def obs_usgs(usgs_id, start, end):
 obs_fns = {"usgs": obs_usgs}
 
 
+def geom_static_data(site, site_type, geom, lat, lon,
+                     area, lc="nlcd", topo="3dep"):
+    lcov_fn = lcov_fns[lc]
+    topo_fn = topo_fns[topo]
+    return pd.DataFrame({"id": site, "id_type": site_type,
+                        "lat": lat, "lon": lon, "area": area} |
+                                  lcov_fn(geom, 1, 1) |
+                                  topo_fn(geom, area),
+                                  index = [site])
+
+
 def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
                    weather="daymet", lc="nlcd",
                    topo="3dep", obs=None):
     # Implements data-retrieval logic for a specified geometry.  See full_data
     # docs.
     weather_fn = weather_fns[weather]
-    lcov_fn = lcov_fns[lc]
-    topo_fn = topo_fns[topo]
     obs_fn = obs_fns[obs] if obs is not None else None
-    statics = pd.DataFrame({"id": site, "id_type": site_type,
-                            "lat": lat, "lon": lon, "area": area} |
-                                      lcov_fn(geom, 1, 1) |
-                                      topo_fn(geom, area),
-                                      index = [site])
+    statics = geom_static_data(site, site_type, geom, lat, lon, area)
     if len(start) > 4:
         dynamics = weather_fn(geom, start, end)#.merge(
             # lcov_fn(geom, start, end), how="left", on="date")
