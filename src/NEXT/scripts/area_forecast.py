@@ -132,21 +132,8 @@ if __name__ == "__main__":
             dorun = runs[index:total:N]
         else:
             dorun = runs
-        # This keeps trying until it runs out of time or out of points
-        start = time.time()
-        while len(dorun) > 0 and (max_t < 0 or time.time() - start < max_t):
-            run_queue = dorun
-            dorun = []
-            print(f"Starting run for index {index}. Queued: {len(run_queue)}.")
-            for run in run_queue:
-                try:
-                    run()
-                except Exception as e:
-                    print(e)
-                    dorun.append(run)
-                if max_t > 0 and time.time() - start > max_t:
-                    break
-            time.sleep(600)  # wait for 10 minutes between attempts to see if things change
+        for run in run_queue:
+            run()
     else:
         print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000] [max runtime (seconds)]
     Runs nested watershed forecasts upstream of the specified gage.
