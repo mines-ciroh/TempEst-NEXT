@@ -17,6 +17,7 @@ import numpy as np
 import datetime
 from pynhd import NLDI
 import sys
+import time
 nldi = NLDI()
 
 def fix_sitename(site):
@@ -134,23 +135,29 @@ if __name__ == "__main__":
         N = int(args[4]) if len(args) >= 5 else 1
         res = float(args[5]) if len(args) >= 6 else 0.01
         dist = int(args[6]) if len(args) >= 7 else 1000
+        max_t = int(args[7]) if len(args) >= 8 else -1
         runs = run_forecasts(end_id, "coefs.pickle", basepath, res, dist)
         if N > 1:
             total = len(runs)
             dorun = runs[index:total:N]
         else:
             dorun = runs
-        for run in dorun:
-            try:
-                run()
-            except Exception as e:
-                print(e)
+        # This keeps trying until it runs out of time or out of points
+        start = time.time()
+        while len(dorun) > 0 and (max_t < 0 or time.time() - start < max_t):
+            run_queue = dorun
+            dorun = []
+            for run in run_queue:
                 try:
                     run()
-                except:
-                    pass
+                except Exception as e:
+                    print(e)
+                    dorun.append(run)
+                if max_t > 0 and time.time() - start > max_t:
+                    break
+            time.sleep(600)  # wait for 10 minutes between attempts to see if things change
     else:
-        print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000]
+        print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000] [max runtime (seconds)]
     Runs nested watershed forecasts upstream of the specified gage.
     After completing a run, switch to the Notebook to quickly retrieve all
     runs.""")
