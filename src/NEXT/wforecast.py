@@ -19,6 +19,8 @@ import cartopy.crs as ccrs
 import metpy
 import warnings
 import getgfs as gfs
+import urllib.request as urq
+import os
 
 
 # Direct copy-paste from https://mesowest.utah.edu/html/hrrr/zarr_documentation/html/zarr_HowToDownload.html
@@ -71,6 +73,49 @@ def hrrr_areal_summary(clipped_fcst, new_name, operator=lambda x: x.mean()):
     return pd.DataFrame({"date": summary.index, new_name: summary})
 
 
+def download_gfs_gribs(start, basepath, time="06", until=384, res="0p25"):
+    # Download all GFS gribs for a given forecast.  Note grib parsing requires a POSIX system.
+    # start must be as YYYYMMDD or "today".
+    if start == "today":
+        start = pd.to_datetime(np.datetime64("today")).strftime("%Y%m%d")
+    for timestep in range(0, until+3, 3):
+        url = f"https://nomads.ncep.noaa.gov/cgi-bin/filter_gfs_{res}.pl?dir=%2Fgfs.{start}%2F{time}%2Fatmos&file=gfs.t{time}z.pgrb2.{res}.f{timestep:03d}&var_DSWRF=on&var_PRATE=on&var_SPFH=on&var_TMP=on&lev_2_m_above_ground=on&lev_surface=on"
+        urq.urlretrieve(url, basepath + f"GFS_{res}_{start}_{time}_h{timestep}.grib")
+
+        
+def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = lambda x: x.max(), step_type="instant"):
+    """
+    This works better than get_gfs, but it requires ecCodes and therefore won't run on Windows.
+    """
+    offset = 273 if var == "t2m" else 0
+    if start == "today":
+        start = pd.to_datetime(np.datetime64("today")).strftime("%Y%m%d")
+    ncpath = basepath + start + ".nc"
+    if os.path.exists(ncpath):
+        data = xr.open_dataset(ncpath)[var]
+    else:
+        contents = [basepath + f for f in os.listdir(basepath) if start in f and f.endswith(".grib")]
+        if len(contents) > 0:
+            data = xr.concat([xr.open_dataset(file, engine="cfgrib", filter_by_keys={'stepType': step_type})[var] for file in contents], dim="time")
+            data.to_netcdf(ncpath)
+        else:
+            download_gfs_gribs(start, basepath)
+            contents = [basepath + f for f in os.listdir(basepath) if start in f and f.endswith(".grib")]
+            data = xr.concat([xr.open_dataset(file, engine="cfgrib", filter_by_keys={'stepType': step_type})[var] for file in contents], dim="time")
+            data.to_netcdf(ncpath)
+    data["time"] = data["valid_time"]
+    data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
+    data["date"] = data["time"].to_series().dt.normalize()
+    try:
+        clip = data.rio.clip(basin.geometry)
+        series = clip.groupby("time").mean(dim=["latitude", "longitude"])
+    except:  # no data in bounds - watershed too small.  Interpolate to centroid instead.
+        ctr = basin.geometry.iloc[0].centroid.coords[0]
+        coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
+        series = data.interp(coords)
+    return op(series.groupby("date")).to_series().rename(new_name) - offset
+    
+
 def get_gfs_timestep(fcst, time, lat, lon, varbs):
     # try:
         f = fcst.get(varbs, time, lat, lon).variables
@@ -102,6 +147,8 @@ def get_gfs(basin, date, varbs=["tmp2m", "spfh2m", "dswrfsfc", "pratesfc"],
     so this is for true forecasts only.
     
     Note precip rate is kg/m2/s = mm/s.  Needs conversion to mm/3hr and sum.
+    
+    This works on Windows, but it's relatively unreliable.
     """
     renamer = {varbs[i]: new_names[i] for i in range(len(varbs))}
     (lon, lat) = basin.geometry.iloc[0].centroid.coords[0]

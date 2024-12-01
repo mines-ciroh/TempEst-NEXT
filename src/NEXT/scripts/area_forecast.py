@@ -33,9 +33,6 @@ def get_site_type(site):
 def prep_name(site, basepath):
     return basepath + f"prep_data_{fix_sitename(site)}.csv"
 
-def fcst_inp_name(site, basepath, today):
-    return basepath + f"inp_forecast_{fix_sitename(site)}_{today}.csv"
-
 def statics_path(site, basepath):
     return basepath + f"statics_{fix_sitename(site)}.csv"
 
@@ -63,31 +60,24 @@ def prepare_model(model, site, basepath):
     return model.make_newt(ws_data, use_climate=False, reset=True).get_newt()
 
 
-def forecast_inputs(site, basepath):
-    earlier = (datetime.date.today() - datetime.timedelta(6)).strftime("%Y-%m-%d")
-    today = datetime.date.today().strftime("%Y-%m-%d")
-    fcst_path = fcst_inp_name(site, basepath, today)
+def forecast_inputs(site, forecast_bp):
+    earlier = (datetime.date.today() - datetime.timedelta(6)).strftime("%Y%m%d")
+    today = datetime.date.today().strftime("%Y%m%d")
     end = (datetime.date.today() + datetime.timedelta(16)).strftime("%Y-%m-%d")
-    if os.path.exists(fcst_path):
-        fcst_input = pd.read_csv(fcst_path, dtype={"id": "str"}, parse_dates=["date"])
-    else:
-        statics = get_statics(site, basepath)
-        (geom, lat, lon, area) = NEXT.data.geom_fns[get_site_type(site)](site)
-        recent_weath = NEXT.data.weather_gfs(geom, earlier, today)
-        fcst_weath = NEXT.data.weather_gfs(geom, today, end)
-        recent = statics.merge(recent_weath, how="cross")
-        fcst = statics.merge(fcst_weath, how="cross")
-        recent = recent[recent["date"] < pd.to_datetime(today)]
-        fcst_input = pd.concat([recent, fcst])
-        fcst_input.index = range(len(fcst_input))
-        fcst_input.to_csv(fcst_path, index=False)
-    return fcst_input
+    (geom, lat, lon, area) = NEXT.data.geom_fns[get_site_type(site)](site)
+    recent_weath = pd.DataFrame(NEXT.wforecast.get_gfs_downloaded(geom, earlier, forecast_bp)).reset_index()
+    fcst_weath = pd.DataFrame(NEXT.wforecast.get_gfs_downloaded(geom, today, forecast_bp)).reset_index()
+    res = pd.concat([fcst_weath, recent_weath]).groupby("date", as_index=False)["tmax"].first().sort_values("date")
+    res["lat"] = lat
+    res["lon"] = lon
+    res["id"] = site
+    return res
 
 
-def run_forecast(model, site, basepath):
+def run_forecast(model, site, basepath, forecast_bp):
     today = datetime.date.today().strftime("%Y-%m-%d")
     newt = prepare_model(model, site, basepath)
-    fcst_input = forecast_inputs(site, basepath)
+    fcst_input = forecast_inputs(site, forecast_bp)
     fcst_input = pd.concat([fcst_input, pd.DataFrame(fcst_input.iloc[22]).T])
     fcst_input.index = range(len(fcst_input))
     fcst_input.loc[len(fcst_input)-1, "date"] = fcst_input["date"].iloc[-2] + np.timedelta64(1, 'D')
