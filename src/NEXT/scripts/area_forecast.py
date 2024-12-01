@@ -101,7 +101,7 @@ def expand_lines(geometry, resolution):
     return pd.concat([expand_line(g, resolution) for g in geometry])
 
 
-def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
+def run_forecasts(end_id, pickle, basepath, forecast_bp, resolution=0.01, dist=1000):
     # Actually returns a list of runnable forecasts.
     (ws, lat, lon, area) = NEXT.data.gage_geom(end_id)
     coords = (lon, lat)
@@ -111,7 +111,7 @@ def run_forecasts(end_id, pickle, basepath, resolution=0.01, dist=1000):
     points = expand_lines(lines.geometry, resolution)
     clist = [pt.coords[0] for pt in points]
     return [
-        (lambda x, y: (lambda: run_forecast(model, f"{x}:{y}", basepath)))(a, b)
+        (lambda x, y: (lambda: run_forecast(model, f"{x}:{y}", basepath, forecast_bp)))(a, b)
         for (a, b) in clist
         ]
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
         res = float(args[5]) if len(args) >= 6 else 0.01
         dist = int(args[6]) if len(args) >= 7 else 1000
         max_t = int(args[7]) if len(args) >= 8 else -1
-        runs = run_forecasts(end_id, "coefs.pickle", basepath, res, dist)
+        runs = run_forecasts(end_id, "coefs.pickle", basepath, "/scratch/dphilippus/gfs/", res, dist)
         if N > 1:
             total = len(runs)
             dorun = runs[index:total:N]
