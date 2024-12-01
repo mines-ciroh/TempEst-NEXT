@@ -147,6 +147,7 @@ if __name__ == "__main__":
         while len(dorun) > 0 and (max_t < 0 or time.time() - start < max_t):
             run_queue = dorun
             dorun = []
+            print(f"Starting run for index {index}. Queued: {len(run_queue)}.")
             for run in run_queue:
                 try:
                     run()
