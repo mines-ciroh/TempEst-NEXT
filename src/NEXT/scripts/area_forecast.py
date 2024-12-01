@@ -132,7 +132,7 @@ if __name__ == "__main__":
             dorun = runs[index:total:N]
         else:
             dorun = runs
-        for run in run_queue:
+        for run in dorun:
             run()
     else:
         print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000] [max runtime (seconds)]
