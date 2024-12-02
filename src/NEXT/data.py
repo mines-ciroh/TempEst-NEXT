@@ -187,9 +187,8 @@ def weather_nldas(geom, start, end):
 
 hrrr_varnames = {
     "TMP": ("tmax", lambda x: x.max()),
-    "PRATE": ("prcp", lambda x: x.sum()),  # needs double-checking
-    "SFCR": ("srad", lambda x: x.mean())  # guessing that's sfc rad?
-    # "something": ("something", lambda x: x.mean())  # humidity??
+    "PRATE": ("prcp", lambda x: x.mean() * 3600 * 24)  # mm/s --> mm/day
+    # "SPFH": ("vp", lambda x: wfc.sph_to_vp(x.mean()))  # humidity, but not available at surface.
     }
 
 def weather_hrrr(geom, start, end):
@@ -208,8 +207,10 @@ def weather_hrrr(geom, start, end):
 def weather_gfs(geom, start, end):
     return wfc.get_gfs(geom, start)
 
+# HRRR can be used for prediction, but not to build coefficient estimation weather,
+# as HRRR-Zarr doesn't have srad.
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
-               "hrrr": weather_hrrr, "gfs": weather_gfs}
+               "gfs": weather_gfs}
 
 # lcov requirements: forest, wetland, developed, ice_snow, water
 def lcov_nlcd(geom, start, end):
