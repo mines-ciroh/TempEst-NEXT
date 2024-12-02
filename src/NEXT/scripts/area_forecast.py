@@ -133,7 +133,10 @@ if __name__ == "__main__":
         else:
             dorun = runs
         for run in dorun:
-            run()
+            try:
+                run()
+            except Exception as e:
+                print(e)
     else:
         print("""Arguments: <USGS gage> <output basepath> [<partition index> <total #partitions>] [resolution=0.01] [distance=1000] [max runtime (seconds)]
     Runs nested watershed forecasts upstream of the specified gage.
