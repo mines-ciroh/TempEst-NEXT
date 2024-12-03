@@ -69,8 +69,12 @@ def hrrr_areal_summary(clipped_fcst, new_name, operator=lambda x: x.mean()):
     """
     Generate areal summary of a selected forecast, grouped by time.
     """
-    summary = clipped_fcst.groupby("time", squeeze=False).map(operator).to_pandas().rename(new_name)
-    return pd.DataFrame({"date": summary.index, new_name: summary})
+    try:
+        summary = clipped_fcst.groupby("time", squeeze=False).map(operator).to_pandas().rename(new_name)
+        return pd.DataFrame({"date": summary.index, new_name: summary})
+    except Exception as e:
+        warnings.warn(f"Failed to retrieve HRRR with error: {e}")
+        return None
 
 
 def download_gfs_gribs(start, basepath, time="06", until=384, res="0p25"):
