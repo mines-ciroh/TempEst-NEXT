@@ -65,12 +65,16 @@ def hrrr_watershed_clip(forecast, basin):
     return forecast.rio.write_crs(hrrr_projection).rio.clip(basin.geometry.values, basin.crs)
 
 
-def hrrr_areal_summary(clipped_fcst, new_name, operator=lambda x: x.mean()):
+def hrrr_areal_summary(basin, date, var, new_name, time_operator, 
+                       areal_operator=lambda x: x.mean()):
     """
     Generate areal summary of a selected forecast, grouped by time.
     """
     try:
-        summary = clipped_fcst.groupby("time", squeeze=False).map(operator).to_pandas().rename(new_name)
+        forecast = get_hrrr(date, var, time_operator)
+        clipped_fcst = hrrr_watershed_clip(forecast, basin)
+        summary = clipped_fcst.groupby("time", squeeze=False).\
+            map(areal_operator).to_pandas().rename(new_name)
         return pd.DataFrame({"date": summary.index, new_name: summary})
     except Exception as e:
         warnings.warn(f"Failed to retrieve HRRR with error: {e}")
@@ -171,7 +175,6 @@ def get_gfs(basin, date, varbs=["tmp2m", "spfh2m", "dswrfsfc", "pratesfc"],
 
 def hrrr_series(basin, dates, var, new_name, operator):
     with warnings.catch_warnings(action="ignore"):
-        raw = pd.concat([hrrr_areal_summary(
-            hrrr_watershed_clip(get_hrrr(date, var, operator), basin), new_name)
+        raw = pd.concat([hrrr_areal_summary(basin, date, var, new_name, operator)
             for date in dates])
         return raw.groupby("date").first()
