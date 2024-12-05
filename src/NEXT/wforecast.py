@@ -111,6 +111,7 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
             contents = [basepath + f for f in os.listdir(basepath) if start in f and f.endswith(".grib")]
             data = xr.concat([xr.open_dataset(file, engine="cfgrib", filter_by_keys={'stepType': step_type})[var] for file in contents], dim="time")
             data.to_netcdf(ncpath)
+    data = data.drop_vars(["time"], errors="ignore")  # in case already present
     data["time"] = data["valid_time"]
     data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
     data["date"] = data["time"].to_series().dt.normalize()
