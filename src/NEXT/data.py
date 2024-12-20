@@ -158,12 +158,15 @@ def get_mean_direction(site, site_type):
         if dy == 0:
             # 90 if dx is positive, 270 if it's negative.
             return 90.0 + 90.0 * (dx - abs(dx)) / dx
-        # Now we don't have to worry about zeroes.  Here, we'll work with
-        # arccos, because it's conveniently always positive.
-        # Now, if dx is positive, then arccos(dy/dx) is our answer.
-        # Otherwise, it's 180 + arccos(dy/dx).
-        offset = 180.0 if dx < 0 else 0.0
-        return offset + (180/3.14) * np.arccos(dy/dx)
+        # Now we don't have to worry about zeroes.
+        # Now, we work with the arctangent.
+        # If dy is positive, its just atan(dx/dy) mod 360.
+        # Otherwise, atan(dx/dy) + 180.
+        base = (180/3.14)*np.arctan(dx/dy)
+        if dy > 0:
+            return base % 360
+        else:
+            return base + 180
     # both zero
     return 0.0
     
