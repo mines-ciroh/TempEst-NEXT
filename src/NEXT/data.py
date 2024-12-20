@@ -79,12 +79,11 @@ def watershed_geom(site):
     return get_watershed(coords)
 
 
-def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
+def get_river(site, site_type, dist):
     """
-    Retrieve a buffer around a specified distance upstream (of the nearest NHD+ point).
+    Get river geometry upstream.
     Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
     or a COMID ("nhd").
-    Distance and buffer should be in km.
     """
     riv = None
     if site_type == "usgs":
@@ -101,7 +100,17 @@ def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
                                   distance=dist)
     if riv is None:
         raise ValueError("get_upstream_buffer: Invalid site type. Must be usgs, comid or coordinates.")
-    riv = riv.to_crs(projstr)  # need projected.  Use the HRRR projection.
+    return riv
+
+
+def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
+    """
+    Retrieve a buffer around a specified distance upstream (of the nearest NHD+ point).
+    Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
+    or a COMID ("nhd").
+    Distance and buffer should be in km.
+    """
+    riv = get_river(site, site_type, dist).to_crs(projstr)  # need projected.  Use the HRRR projection.
     dist *= 1000  # meters
     buffer *= 1000  # meters
     lens = riv.length.cumsum()
@@ -127,6 +136,37 @@ def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
     subset = subset.assign(site=str(site)).dissolve("site")
     buf = subset.buffer(buffer)
     return buf.to_crs(original)
+
+
+def get_mean_direction(site, site_type):
+    """
+    Retrieve the mean direction of the last ~kilometer of the river.
+    Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
+    or a COMID ("nhd").
+    """
+    riv = get_river(site, site_type, 1).geometry.iloc[0].reverse()
+    (lon1, lat1) = riv.coords[0]  # bottom
+    (lon0, lat0) = riv.interpolate(0.01).coords[0]  # approx. 1 km upstream
+    dy = lat1 - lat0  # distance north
+    dx = lon1 - lon0  # distance east
+    # We want the usual map angle (clockwise from north), but we're going to
+    # throw in some if/else logic to avoid division by zero, etc.
+    if dx != 0 or dy != 0:
+        if dx == 0:
+            # This is either 0 or 2, so 180 if negative, 0 if positive.
+            return 90.0 * (dy - abs(dy)) / dy
+        if dy == 0:
+            # 90 if dx is positive, 270 if it's negative.
+            return 90.0 + 90.0 * (dx - abs(dx)) / dx
+        # Now we don't have to worry about zeroes.  Here, we'll work with
+        # arccos, because it's conveniently always positive.
+        # Now, if dx is positive, then arccos(dy/dx) is our answer.
+        # Otherwise, it's 180 + arccos(dy/dx).
+        offset = 180.0 if dx < 0 else 0.0
+        return offset + (180/3.14) * np.arccos(dy/dx)
+    # both zero
+    return 0.0
+    
 
 
 def get_upstream(coordinates, dist=1):
