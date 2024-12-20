@@ -78,6 +78,57 @@ def watershed_geom(site):
     coords = [float(x) for x in site.split(":")]
     return get_watershed(coords)
 
+
+def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
+    """
+    Retrieve a buffer around a specified distance upstream (of the nearest NHD+ point).
+    Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
+    or a COMID ("nhd").
+    Distance and buffer should be in km.
+    """
+    riv = None
+    if site_type == "usgs":
+        site = "USGS-" + site
+        ltype = "nwissite"
+        riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
+                                 distance=dist)
+    if site_type == "comid":
+        ltype = "comid"
+        riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
+                                 distance=dist)
+    if site_type == "coordinates":
+        riv = nldi.navigate_byloc(site, "upstreamMain", source="flowlines",
+                                  distance=dist)
+    if riv is None:
+        raise ValueError("get_upstream_buffer: Invalid site type. Must be usgs, comid or coordinates.")
+    riv = riv.to_crs(projstr)  # need projected.  Use the HRRR projection.
+    dist *= 1000  # meters
+    buffer *= 1000  # meters
+    lens = riv.length.cumsum()
+    # How many segments do we need?
+    howfar = len(lens[lens < dist]) + 1
+    if howfar == len(riv):
+        # Use the whole river, because we ran out of river.
+        subset = riv
+    else:
+        sofar = lens[lens < dist].max()  # how far we got before
+        remaining = dist - sofar  # how much more we need
+        subset = riv.head(howfar)
+        # The last (most upstream segment)
+        last_bit = subset.geometry.iloc[-1]
+        # Why are we going backwards?  Because the individual linestrings go
+        # from top to bottom, even though the sequence of linestrings goes
+        # from bottom to top.  Fun, right?
+        last_bit = shp.ops.substring(last_bit,
+                                     last_bit.length - remaining,
+                                     last_bit.length)
+        # Now our river should be exactly the right length.
+        subset.loc[howfar-1, "geometry"] = last_bit
+    subset = subset.assign(site=str(site)).dissolve("site")
+    buf = subset.buffer(buffer)
+    return buf.to_crs(original)
+
+
 def get_upstream(coordinates, dist=1):
     """
     Retrieve upstream flow network from a given coordinates.
@@ -253,6 +304,23 @@ def lcov_nlcd(geom, start, end):
     #                   for x in avail_years])
 
 lcov_fns = {"nlcd": lcov_nlcd}
+
+def get_canopy(geom, date):
+    """
+    Get mean canopy cover for the specified geometry and date.
+    Date can be anything parseable by numpy.
+    It will be moved into the nearest date in the range (2011, 2021), which
+    is supported by NLCD.
+    """
+    year = np.datetime64(date).astype('datetime64[Y]').astype(int) + 1970
+    if year < 2011:
+        year = 2011
+    if year > 2021:
+        year = 2021
+    cc = list(nlcd.nlcd_bygeom(geom, years={"canopy": [year]}).values()
+              )[0][f"canopy_{year}"]
+    return float(cc.mean())
+    
 
 # topo requirements: slope, elev_min, elev
 def topo_3dep(geom, area):
