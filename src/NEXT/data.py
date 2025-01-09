@@ -110,6 +110,8 @@ def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
     or a COMID ("nhd").
     Distance and buffer should be in km.
     """
+    if site_type == "coordinates" and type(site) == str:
+        site = tuple([float(x) for x in site.split(":")])
     riv = get_river(site, site_type, dist).to_crs(projstr)  # need projected.  Use the HRRR projection.
     dist *= 1000  # meters
     buffer *= 1000  # meters
@@ -144,6 +146,8 @@ def get_mean_direction(site, site_type):
     Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
     or a COMID ("nhd").
     """
+    if site_type == "coordinates" and type(site) == str:
+        site = tuple([float(x) for x in site.split(":")])
     riv = get_river(site, site_type, 1).geometry.iloc[0].reverse()
     (lon1, lat1) = riv.coords[0]  # bottom
     (lon0, lat0) = riv.interpolate(0.01).coords[0]  # approx. 1 km upstream
@@ -395,7 +399,9 @@ def geom_static_data(site, site_type, geom, lat, lon,
     lcov_fn = lcov_fns[lc]
     topo_fn = topo_fns[topo]
     return pd.DataFrame({"id": site, "id_type": site_type,
-                        "lat": lat, "lon": lon, "area": area} |
+                        "lat": lat, "lon": lon, "area": area,
+                        "flowdir": get_mean_direction(site, site_type)
+                        } |
                                   lcov_fn(geom, 1, 1) |
                                   topo_fn(geom, area),
                                   index = [site])
@@ -410,13 +416,20 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
     obs_fn = obs_fns[obs] if obs is not None else None
     statics = geom_static_data(site, site_type, geom, lat, lon, area)
     if len(start) > 4:
-        dynamics = weather_fn(geom, start, end)#.merge(
-            # lcov_fn(geom, start, end), how="left", on="date")
+        dynamics = weather_fn(geom, start, end)
+        fyr = pd.to_datetime(start).year
+        lyr = pd.to_datetime(end).year + 1
     else:
         dynamics = pd.concat([
             weather_fn(geom, str(st) + "-01-01", str(st) + "-12-31")
             for st in range(int(start), int(end)+1)
             ])
+        fyr = int(start)
+        lyr = int(end) + 1
+    buf = get_upstream_buffer(site, site_type, 1, 0.015)
+    canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    dynamics["year"] = dynamics["date"].dt.year
+    dynamics = dynamics.merge(canopy, on="year").drop(columns="year")
     if obs_fn is not None:
         dynamics = dynamics.merge(obs_fn(site, start, end),
                                   how="left", on="date")
