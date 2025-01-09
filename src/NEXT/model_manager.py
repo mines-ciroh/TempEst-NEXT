@@ -14,33 +14,57 @@ from NEWT import Watershed, engines
 import rtseason as rts
 import pandas as pd
 import pickle
+import scipy
+import pygam
+import numpy as np
+
+def fit_anomgam(data, N=500000):
+    # Data has: id, date, tmax, temperature
+    # N: number of rows to sample for training.  The dev. sample ~3M is too many.
+    at_conv = np.array([0.132, 0.401, 0.162, 0.119, 0.056, 0.13 ])
+    data["day"] = data["date"].dt.day_of_year
+    dailies = data.groupby(["id", "day"])[["temperature", "tmax"]].mean().rename(columns={"temperature": "actemp"})
+    anom = data.merge(dailies, on=["id", "day"], suffixes=["", "_mean"])
+    anom["delta_st"] = anom["temperature"] - anom["actemp"]
+    anom["delta_at"] = anom["tmax"] - anom["tmax_mean"]
+    anom = anom[["id", "date", "day", "actemp", "delta_st", "delta_at"]].sort_values(["id", "date"])
+    def fit_anom(grp):
+        grp["delta_at"] = scipy.signal.fftconvolve(grp["delta_at"],
+                                                   at_conv, mode="full")[:-(len(at_conv) - 1)]
+        grp["delta_at"] *= grp["delta_st"].abs().mean() / grp["delta_at"].abs().mean()
+        return grp
+    anom = anom.groupby("id").apply(fit_anom, include_groups=False).sample(n=N)
+    X = anom[["actemp", "delta_at"]]
+    y = anom["delta_st"]
+    return pygam.LinearGAM(pygam.te(0, 1)).fit(X, y)
+    
 
 class NEXT(object):
-    def __init__(self, model):
+    def __init__(self, model, anomgam):
         # Initialize with a fully-built coefficient estimator model
         self.model = model
+        self.anomgam = anomgam
         self.newt = None
     
-    def from_preproc_data(data):
+    def from_preproc_data(data, anomgam):
         # Initialize from pre-processed data
-        return NEXT(coef_est.build_model_from_data(data))
+        return NEXT(coef_est.build_model_from_data(data), anomgam)
     
     def from_data(data):
         # Initialize from raw data
+        anomgam = fit_anomgam(data)
         return NEXT.from_preproc_data(
-            mcoef.build_training_data(data)
+            mcoef.build_training_data(data),
+            anomgam
             )
     
     def to_pickle(self, file):
         with open(file, 'wb') as f:
-            pickle.dump(self.model, f)
+            pickle.dump(NEXT(self.model, self.anomgam), f)
     
     def from_pickle(file):
         with open(file, 'rb') as f:
-            return NEXT(pickle.load(f))
-    
-    def from_default_pickle():
-        return NEXT.from_pickle("coefs.pickle")
+            return pickle.load(f)
     
     def make_newt(self, data, start_date="2020-01-01", use_climate=True,
                   climyears=0, reset=False,
@@ -67,18 +91,13 @@ class NEXT(object):
             min_temp = ssn.generate_ts()["actemp"].min()
             min_temp = min_temp if min_temp > 0 else 0
             model = Watershed(seasonality=ssn,
-                              at_coef=coefs["threshold_coef_max"].iloc[0],
+                              at_coef=coefs["at_coef"].iloc[0],
                               at_day=at_day,
                               dynamic_period=7,
-                              dynamic_engine=engines.ThresholdSensitivityEngine(
-                                  act_min=min_temp,
-                                  coef_min=coefs["threshold_coef_min"].iloc[0],
-                                  act_cutoff=coefs["threshold_act_cutoff"].iloc[0],
-                                  coef_max=coefs["threshold_coef_max"].iloc[0]
-                              ),
                               climate_engine=engines.ClimateCoefficientEngine(self.model, years=climyears) if use_climate else None,
                               climate_period=365,
                               extra_history_columns=engines.ClimateCoefficientEngine.required_columns if use_climate else [],
+                              anomgam=self.anomgam,
                               **kwargs
                              )
             self.coefficients = coefs
