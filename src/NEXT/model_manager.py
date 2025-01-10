@@ -37,6 +37,8 @@ def fit_anomgam(data, N=500000):
             return grp
         else:
             return None
+    if N > len(anom):
+        N = len(anom)
     anom = anom.groupby("id").apply(fit_anom, include_groups=False).sample(n=N)
     X = anom[["actemp", "delta_at"]]
     y = anom["delta_st"]
