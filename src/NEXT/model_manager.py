@@ -31,8 +31,12 @@ def fit_anomgam(data, N=500000):
     def fit_anom(grp):
         grp["delta_at"] = scipy.signal.fftconvolve(grp["delta_at"],
                                                    at_conv, mode="full")[:-(len(at_conv) - 1)]
-        grp["delta_at"] *= grp["delta_st"].abs().mean() / grp["delta_at"].abs().mean()
-        return grp
+        base = grp["delta_at"].abs().mean()
+        if base > 0:
+            grp["delta_at"] *= grp["delta_st"].abs().mean() / base
+            return grp
+        else:
+            return None
     anom = anom.groupby("id").apply(fit_anom, include_groups=False).sample(n=N)
     X = anom[["actemp", "delta_at"]]
     y = anom["delta_st"]
