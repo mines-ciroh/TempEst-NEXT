@@ -121,8 +121,8 @@ class NEXT(object):
             upto = lambda data, yr: data[data["date"].dt.year <= yr]
             exact = lambda data, yr: data[data["date"].dt.year == yr]
             return pd.concat([
-                exact(self.newt.run_series(upto(data, yr), reset=True,
-                                           use_climate=True, climyears=self.climyears), yr)
+                self.make_newt(upto(data, yr), reset=True, use_climate=True,
+                               climyears=self.climyears).get_newt().run_series(exact(data, yr))
                 for yr in yrs
                 ])
         else:
