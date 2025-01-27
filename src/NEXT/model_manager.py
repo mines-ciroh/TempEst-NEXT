@@ -8,8 +8,7 @@ This file contains a model-manager class that actually handles model building,
 etc.  Mostly a wrapper around coef_est.
 """
 
-import NEWT.coef_est as coef_est
-import NEWT.make_coefficients as mcoef
+import NEXT.coef_est as coef_est
 from NEWT import Watershed, engines
 import rtseason as rts
 import pandas as pd
@@ -60,7 +59,7 @@ class NEXT(object):
         # Initialize from raw data
         anomgam = fit_anomgam(data)
         return NEXT.from_preproc_data(
-            mcoef.build_training_data(data),
+            coef_est.build_training_data(data),
             anomgam
             )
     
@@ -72,12 +71,17 @@ class NEXT(object):
         with open(file, 'rb') as f:
             return pickle.load(f)
     
-    def make_newt(self, data, start_date="2020-01-01", use_climate=True,
-                  climyears=0, reset=False,
-                  **kwargs):
+    def make_newt(self, data, start_date="2020-01-01", reset=False, use_climate=False,
+                  climyears=0, **kwargs):
         # Build a model using provided site data
+        self.use_climate = use_climate
+        self.climyears = climyears
         if reset or self.newt is None:
             data = data.copy()
+            if use_climate:
+                data = data.loc[
+                    data["date"].dt.year >= data["date"].dt.year.max() - climyears
+                    , :]
             data["date"] = pd.to_datetime(data["date"])
             data["day"] = data["date"].dt.day_of_year
             pdata = coef_est.preprocess(data)
@@ -99,10 +103,7 @@ class NEXT(object):
             model = Watershed(seasonality=ssn,
                               at_coef=coefs["at_coef"].iloc[0],
                               at_day=at_day,
-                              dynamic_period=7,
-                              climate_engine=engines.ClimateCoefficientEngine(self.model, years=climyears) if use_climate else None,
-                              climate_period=365,
-                              extra_history_columns=engines.ClimateCoefficientEngine.required_columns if use_climate else [],
+                              climate_engine=None,
                               anomgam=self.anomgam,
                               **kwargs
                              )
@@ -114,7 +115,18 @@ class NEXT(object):
     def run(self, data, reset=False, **args):
         # Prepare and run model.
         self.make_newt(data, reset=reset, **args)
-        return self.newt.run_series(data)
+        if self.use_climate:
+            yrs = list(data["date"].dt.year.unique())
+            yrs.sort()
+            upto = lambda data, yr: data[data["date"].dt.year <= yr]
+            exact = lambda data, yr: data[data["date"].dt.year == yr]
+            return pd.concat([
+                exact(self.newt.run_series(upto(data, yr), reset=True,
+                                           use_climate=True, climyears=self.climyears), yr)
+                for yr in yrs
+                ])
+        else:
+            return self.newt.run_series(data)
     
     def get_newt(self):
         return self.newt
