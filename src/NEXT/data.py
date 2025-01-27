@@ -91,7 +91,7 @@ def get_river(site, site_type, dist):
         ltype = "nwissite"
         riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
                                  distance=dist)
-    if site_type == "comid":
+    if site_type == "comid" or site_type == "nhd":
         ltype = "comid"
         riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
                                  distance=dist)
@@ -99,7 +99,7 @@ def get_river(site, site_type, dist):
         riv = nldi.navigate_byloc(site, "upstreamMain", source="flowlines",
                                   distance=dist)
     if riv is None:
-        raise ValueError("get_upstream_buffer: Invalid site type. Must be usgs, comid or coordinates.")
+        raise ValueError("get_river: Invalid site type. Must be usgs, comid or coordinates.")
     return riv
 
 
@@ -426,6 +426,10 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
+    if not site_type in ["usgs", "comid", "coordinates"]:
+        # For weird stuff like geopackage, just switch it to the coordinates
+        site = f"{lon}:{lat}"
+        site_type = "coordinates"
     buf = get_upstream_buffer(site, site_type, 1, 0.015)
     canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     dynamics["year"] = dynamics["date"].dt.year
