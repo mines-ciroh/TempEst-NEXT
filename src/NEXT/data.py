@@ -99,7 +99,7 @@ def get_river(site, site_type, dist):
         riv = nldi.navigate_byloc(site, "upstreamMain", source="flowlines",
                                   distance=dist)
     if riv is None:
-        raise ValueError("get_river: Invalid site type. Must be usgs, comid or coordinates.")
+        raise ValueError(f"get_river: Invalid site type '{site_type}'. Must be usgs, comid or coordinates.")
     return riv
 
 
@@ -414,6 +414,10 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
     # docs.
     weather_fn = weather_fns[weather]
     obs_fn = obs_fns[obs] if obs is not None else None
+    if site_type not in ["usgs", "comid", "coordinates"]:
+        # For weird stuff like geopackage, just switch it to the coordinates
+        site = f"{lon}:{lat}"
+        site_type = "coordinates"
     statics = geom_static_data(site, site_type, geom, lat, lon, area)
     if len(start) > 4:
         dynamics = weather_fn(geom, start, end)
@@ -426,10 +430,6 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    if site_type not in ["usgs", "comid", "coordinates"]:
-        # For weird stuff like geopackage, just switch it to the coordinates
-        site = f"{lon}:{lat}"
-        site_type = "coordinates"
     buf = get_upstream_buffer(site, site_type, 1, 0.015)
     canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     dynamics["year"] = dynamics["date"].dt.year
