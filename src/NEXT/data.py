@@ -426,7 +426,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    if not site_type in ["usgs", "comid", "coordinates"]:
+    if site_type not in ["usgs", "comid", "coordinates"]:
         # For weird stuff like geopackage, just switch it to the coordinates
         site = f"{lon}:{lat}"
         site_type = "coordinates"
