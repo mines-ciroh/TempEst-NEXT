@@ -17,7 +17,7 @@ from NEWT import analysis, statics, Watershed
 inp_cols = ["tmax", "prcp", "srad", "vp",
             "area", "elev_min", "elev", "slope",
             "forest", "wetland", "developed", "ice_snow", "water",
-            "canopy", "flowdir",
+            "canopy", "flowdir", "ws_canopy",
             "lat", "lon", "date", "day"]
 req_cols = inp_cols + ["id"]
 training_req_cols = req_cols + ["temperature"]
