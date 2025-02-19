@@ -35,7 +35,7 @@ import shapely as shp
 import NEXT.wforecast as wfc
 
 tid = "10343500"
-nldi = NLDI()
+nldi_inst = None
 catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 # This is on a river, but there are no gages nearby.
@@ -44,6 +44,12 @@ testco_site = ":".join([str(x) for x in testco])
 testpt = gpd.GeoSeries([shp.Point(testco)], crs=4326)
 tcomid = "918351"
 tusgs = "usgs:10343500"
+
+
+def nldi():
+    if nldi_inst is None:
+        nldi_inst = NLDI()
+    return nldi_inst
 
 
 def get_endpoint(lstr):
@@ -65,8 +71,8 @@ def get_watershed(coordinates):
     """
     Retrieve watershed shape for a given set of coordinates.
     """
-    comid = nldi.comid_byloc(coordinates)["comid"].iloc[0]
-    ws = nldi.get_basins(comid, "comid")
+    comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
+    ws = nldi().get_basins(comid, "comid")
     area = ws.to_crs(projstr).area
     return (ws, coordinates[1], coordinates[0], area.iloc[0])
 
@@ -89,14 +95,14 @@ def get_river(site, site_type, dist):
     if site_type == "usgs":
         site = "USGS-" + site
         ltype = "nwissite"
-        riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
+        riv = nldi().navigate_byid(ltype, site, "upstreamMain", source="flowlines",
                                  distance=dist)
     if site_type == "comid" or site_type == "nhd":
         ltype = "comid"
-        riv = nldi.navigate_byid(ltype, site, "upstreamMain", source="flowlines",
+        riv = nldi().navigate_byid(ltype, site, "upstreamMain", source="flowlines",
                                  distance=dist)
     if site_type == "coordinates":
-        riv = nldi.navigate_byloc(site, "upstreamMain", source="flowlines",
+        riv = nldi().navigate_byloc(site, "upstreamMain", source="flowlines",
                                   distance=dist)
     if riv is None:
         raise ValueError(f"get_river: Invalid site type '{site_type}'. Must be usgs, comid or coordinates.")
@@ -189,7 +195,7 @@ def get_upstream(coordinates, dist=1):
     if type(coordinates) != tuple and type(coordinates) != str:
         raise ValueError("Invalid coordinate format: get_upstream")
     if type(coordinates) == tuple:
-        loc = nldi.feature_byloc(coordinates)["comid"].iloc[0]
+        loc = nldi().feature_byloc(coordinates)["comid"].iloc[0]
         ltype = "comid"
     else:
         [ltype, loc] = coordinates.split(":")
@@ -198,23 +204,23 @@ def get_upstream(coordinates, dist=1):
         if ltype == "usgs":
             ltype = "nwissite"
             loc = "USGS-" + loc
-    main = nldi.navigate_byid(ltype, loc, "upstreamMain", source="flowlines",
+    main = nldi().navigate_byid(ltype, loc, "upstreamMain", source="flowlines",
                                 distance=dist)
     mco = unroll_coords(main)
-    tribs = nldi.navigate_byid(ltype, loc, "upstreamTributaries", source="flowlines",
+    tribs = nldi().navigate_byid(ltype, loc, "upstreamTributaries", source="flowlines",
                                 distance=dist)
     # Get tributaries that aren't in the mainstem, but do drain into it
     tribs = tribs[-(tribs["nhdplus_comid"].isin(main["nhdplus_comid"])) &
                   (tribs.geometry.apply(get_endpoint).isin(mco))]
     # Retrieve all contributing basins EXCEPT direct mainstem reaches
     if len(tribs) > 0:
-        trib_bas = nldi.get_basins(tribs["nhdplus_comid"], "comid").assign(what="tributary")
+        trib_bas = nldi().get_basins(tribs["nhdplus_comid"], "comid").assign(what="tributary")
         trib_bas["endpoint"] = tribs.geometry.apply(get_endpoint).to_list()
         trib_bas["area"] = trib_bas.to_crs(projstr).area
     else:
         trib_bas = None
     # Now figure out the mainstem basin for the top of the reach of interest
-    upper = nldi.get_basins(main["nhdplus_comid"].iloc[-1], "comid").assign(what="mainstem")
+    upper = nldi().get_basins(main["nhdplus_comid"].iloc[-1], "comid").assign(what="mainstem")
     return (trib_bas, upper, main)
 
 
@@ -237,7 +243,7 @@ def buffer(data, buffer):
 def gage_geom(usgs_id):
     # Geometries return (geometry, lat, lon, area in m2)
     # geometry should be a Geopandas, not a raw geometry
-    shp = nldi.get_basins(usgs_id)
+    shp = nldi().get_basins(usgs_id)
     area = (shp.to_crs(projstr).area.rename("area").iloc[0])
     rc = nwis.get_record(sites=usgs_id, service="site")[["dec_lat_va", "dec_long_va"]]
     return (shp,
