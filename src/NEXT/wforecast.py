@@ -113,7 +113,8 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
             data.to_netcdf(ncpath)
     data["time"] = data["valid_time"]
     data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
-    data["date"] = data["time"].to_series().dt.normalize()
+    # data["date"] = data["time"].to_series().dt.normalize()
+    data = data.assign_coords(date = ("time", data["time"].to_series().dt.normalize()))
     try:
         clip = data.rio.clip(basin.geometry)
         series = clip.groupby("time").mean(dim=["latitude", "longitude"])
