@@ -35,7 +35,7 @@ import shapely as shp
 import NEXT.wforecast as wfc
 
 tid = "10343500"
-nldi_inst = None
+nldi_inst = [None]
 catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 # This is on a river, but there are no gages nearby.
@@ -47,9 +47,9 @@ tusgs = "usgs:10343500"
 
 
 def nldi():
-    if nldi_inst is None:
-        nldi_inst = NLDI()
-    return nldi_inst
+    if nldi_inst[0] is None:
+        nldi_inst[0] = NLDI()
+    return nldi_inst[0]
 
 
 def get_endpoint(lstr):
@@ -406,7 +406,7 @@ def geom_static_data(site, site_type, geom, lat, lon,
     topo_fn = topo_fns[topo]
     return pd.DataFrame({"id": site, "id_type": site_type,
                         "lat": lat, "lon": lon, "area": area,
-                        "flowdir": get_mean_direction(site, site_type)
+                        # "flowdir": get_mean_direction(site, site_type)
                         } |
                                   lcov_fn(geom, 1, 1) |
                                   topo_fn(geom, area),
