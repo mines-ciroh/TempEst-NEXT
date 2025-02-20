@@ -109,7 +109,29 @@ def get_river(site, site_type, dist):
     return riv
 
 
-def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
+def centroid(geom):
+    """
+    Smart centroid function that works for GeoPandas rows _or_ Shapely shapes.
+
+    Parameters
+    ----------
+    geom : Series or Polygon
+        Geometry to be analyzed, either as a series (with .geometry) or a
+        Shapely object.
+
+    Returns
+    -------
+    Centroid as a Shapely point.
+
+    """
+    if type(geom) == pd.Series:
+        geom = geom.geometry
+    if type(geom) == gpd.GeoDataFrame:
+        geom = geom.geometry.iloc[0]
+    return geom.centroid
+
+
+def get_upstream_buffer(site, site_type, dist, buffer, geom=None, original=4326):
     """
     Retrieve a buffer around a specified distance upstream (of the nearest NHD+ point).
     Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
@@ -118,32 +140,48 @@ def get_upstream_buffer(site, site_type, dist, buffer, original=4326):
     """
     if site_type == "coordinates" and type(site) == str:
         site = tuple([float(x) for x in site.split(":")])
-    riv = get_river(site, site_type, dist).to_crs(projstr)  # need projected.  Use the HRRR projection.
     dist *= 1000  # meters
     buffer *= 1000  # meters
-    lens = riv.length.cumsum()
-    # How many segments do we need?
-    howfar = len(lens[lens < dist]) + 1
-    if howfar == len(riv):
-        # Use the whole river, because we ran out of river.
-        subset = riv
-    else:
-        sofar = lens[lens < dist].max()  # how far we got before
-        remaining = dist - sofar  # how much more we need
-        subset = riv.head(howfar)
-        # The last (most upstream segment)
-        last_bit = subset.geometry.iloc[-1]
-        # Why are we going backwards?  Because the individual linestrings go
-        # from top to bottom, even though the sequence of linestrings goes
-        # from bottom to top.  Fun, right?
-        last_bit = shp.ops.substring(last_bit,
-                                     last_bit.length - remaining,
-                                     last_bit.length)
-        # Now our river should be exactly the right length.
-        subset.loc[howfar-1, "geometry"] = last_bit
-    subset = subset.assign(site=str(site)).dissolve("site")
-    buf = subset.buffer(buffer)
-    return buf.to_crs(original)
+    try:
+        riv = get_river(site, site_type, dist).to_crs(projstr)  # need projected.  Use the HRRR projection.
+        lens = riv.length.cumsum()
+        # How many segments do we need?
+        howfar = len(lens[lens < dist]) + 1
+        if howfar == len(riv):
+            # Use the whole river, because we ran out of river.
+            subset = riv
+        else:
+            sofar = lens[lens < dist].max()  # how far we got before
+            remaining = dist - sofar  # how much more we need
+            subset = riv.head(howfar)
+            # The last (most upstream segment)
+            last_bit = subset.geometry.iloc[-1]
+            # Why are we going backwards?  Because the individual linestrings go
+            # from top to bottom, even though the sequence of linestrings goes
+            # from bottom to top.  Fun, right?
+            last_bit = shp.ops.substring(last_bit,
+                                         last_bit.length - remaining,
+                                         last_bit.length)
+            # Now our river should be exactly the right length.
+            subset.loc[howfar-1, "geometry"] = last_bit
+        subset = subset.assign(site=str(site)).dissolve("site")
+        buf = subset.buffer(buffer)
+        return buf.to_crs(original)
+    except Exception as e:
+        # NLDI probably broke.
+        if site_type != "coordinates" or geom is None:
+            raise e
+        # If we have coordinates, we can go from the pour point to the
+        # centroid.
+        origin = shp.Point(site)
+        ctr = centroid(geom)
+        line = gpd.GeoDataFrame(geometry=[shp.LineString([origin, ctr])],
+                                crs=original).to_crs(projstr).geometry.iloc[0]
+        subset = shp.ops.substring(line, 0, dist)
+        # buf = subset.buffer(buffer)
+        buf = gpd.GeoDataFrame(geometry=[subset.buffer(buffer)],
+                                crs=projstr)
+        return buf.to_crs(original)
 
 
 def get_mean_direction(site, site_type):
@@ -436,7 +474,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    buf = get_upstream_buffer(site, site_type, 1, 0.015)
+    buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
     canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     dynamics["year"] = dynamics["date"].dt.year
     dynamics = dynamics.merge(canopy, on="year").drop(columns="year")
