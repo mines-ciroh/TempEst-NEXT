@@ -475,9 +475,12 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
         fyr = int(start)
         lyr = int(end) + 1
     buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
-    canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    ws_canopy = pd.DataFrame([{"year": year, "ws_canopy": get_canopy(geom, str(year))} for year in range(fyr, lyr)])
     dynamics["year"] = dynamics["date"].dt.year
-    dynamics = dynamics.merge(canopy, on="year").drop(columns="year")
+    dynamics = dynamics.merge(buf_canopy, on="year"
+                              ).merge(ws_canopy, on="year"
+                                      ).drop(columns="year")
     if obs_fn is not None:
         dynamics = dynamics.merge(obs_fn(site, start, end),
                                   how="left", on="date")
