@@ -544,6 +544,6 @@ def all_data_gpkg(path, start, end, weather="daymet", lc="nlcd",
     gpdata = gpkg_geoms(path, cumulative)
     for k, v in gpdata.items():
         try:
-            yield (k, geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end))
+            yield (k, geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end, weather=weather, lc=lc, topo=topo))
         except Exception as e:
             yield (k, handler(k, v[0], e))
