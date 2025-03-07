@@ -352,7 +352,7 @@ def weather_gfs(geom, start, end):
 # HRRR can be used for prediction, but not to build coefficient estimation weather,
 # as HRRR-Zarr doesn't have srad.
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
-               "gfs": weather_gfs}
+        "gfs": weather_gfs, "hrrr": weather_hrrr}
 
 # lcov requirements: forest, wetland, developed, ice_snow, water
 def lcov_nlcd(geom, start, end):
