@@ -12,6 +12,8 @@ import pandas as pd
 import numpy as np
 from NEWT import analysis, statics, Watershed
 
+rand = np.random.default_rng()
+
 # Used: ['slope', 'elev_min', 'elev', 'area', 'intercept', 'srad_sd', 'cold_prcp', 'prcp', 'prcp_sd', 'srad', 'water', 'wetland', 'developed', 'ssn_phi', 'Intercept', 'ice_snow', 'vp_sd', 'lat', 'tamp', 'frozen', 'lon', 'ssn_index', 'forest']
 
 inp_cols = ["tmax", "prcp", "srad", "vp",
@@ -110,12 +112,16 @@ def build_model_from_data(tr_data):
     return vars_local
 
 
-def predict_site_coefficients(model, data):
+def predict_site_coefficients(model, data, draw=False):
     """
     Predicts model coefficients using the provided (pre-processed) data for
     a specific site.  Then invert PCA to produce NEWT coefficients.
+    If draw is True, generate a random draw.
     """
-    predictor = lambda cols, gam, ws: gam.predict(ws[cols])[0]
+    if draw:
+        predictor = lambda cols, gam, ws: gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0]
+    else:
+        predictor = lambda cols, gam, ws: gam.predict(ws[cols])[0]
     pcaed = {}
     for vs in model:
         pcaed[vs["name"]] = predictor(vs["vars"], vs["gam"], data)
@@ -125,14 +131,14 @@ def predict_site_coefficients(model, data):
     return inv * scale + offset
 
 
-def predict_all_coefficients(model, data):
+def predict_all_coefficients(model, data, draw=False):
     """
     Predicts model coefficients for all sites.
     """
     keepll = "lat" in data.columns and "lon" in data.columns
     keep = data[["id", "elev", "lat", "lon"]] if keepll else data[["id", "elev"]]
     coefs = data.groupby("id").apply(
-        lambda x: predict_site_coefficients(model, x),
+        lambda x: predict_site_coefficients(model, x, draw),
         include_groups=False)
     return coefs.droplevel(1).merge(keep, how="left", on="id")
 

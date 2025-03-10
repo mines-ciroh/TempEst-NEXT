@@ -72,8 +72,9 @@ class NEXT(object):
             return pickle.load(f)
     
     def make_newt(self, data, start_date="2020-01-01", reset=False, use_climate=False,
-                  climyears=0, **kwargs):
+                  climyears=0, draw=False, **kwargs):
         # Build a model using provided site data
+        # If draw is True, generate a random draw instead of the main estimate.
         self.use_climate = use_climate
         self.climyears = climyears
         if reset or self.newt is None:
@@ -86,7 +87,8 @@ class NEXT(object):
             data["day"] = data["date"].dt.day_of_year
             pdata = coef_est.preprocess(data)
             coefs = coef_est.predict_site_coefficients(self.model,
-                                                       pdata)
+                                                       pdata,
+                                                       draw)
             at_day = data.groupby(["day"], as_index=False)["tmax"].mean().rename(columns={"tmax": "mean_tmax"})
             ssn = rts.ThreeSine(
                 Intercept=coefs["Intercept"].iloc[0],
