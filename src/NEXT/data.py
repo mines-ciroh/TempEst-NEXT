@@ -343,7 +343,7 @@ def weather_hrrr(geom, start, end):
                         hrrr_varnames[var][0],
                         hrrr_varnames[var][1])
         for var in hrrr_varnames
-        ], axis=1)
+        ], axis=1).reset_index()
 
 
 def weather_gfs(geom, start, end):
