@@ -100,7 +100,7 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
         start = pd.to_datetime(np.datetime64("today")).strftime("%Y%m%d")
     ncpath = basepath + start + ".nc"
     if os.path.exists(ncpath):
-        data = xr.open_dataset(ncpath)[var]
+        data = xr.open_dataset(ncpath, decode_times=True)[var]
     else:
         contents = [basepath + f for f in os.listdir(basepath) if start in f and f.endswith(".grib")]
         if len(contents) > 0:
