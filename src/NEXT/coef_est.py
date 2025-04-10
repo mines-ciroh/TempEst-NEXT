@@ -109,6 +109,7 @@ def build_model_from_data(tr_data):
     Y.columns = coef_names
     for vs in vars_local:
         vs["gam"] = LinearGAM(vs["eq"], lam=vs["lam"]).fit(X[vs["vars"]], Y[vs["name"]])
+        vs["noise"] = np.sqrt(np.mean((vs["gam"].predict(X[vs["vars"]]) - Y[vs["name"]])**2))
     return vars_local
 
 
@@ -119,12 +120,13 @@ def predict_site_coefficients(model, data, draw=False):
     If draw is True, generate a random draw.
     """
     if draw:
-        predictor = lambda cols, gam, ws: gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0]
+        predictor = lambda cols, gam, ws, noise: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
+                                                  rand.normal(scale=noise))
     else:
-        predictor = lambda cols, gam, ws: gam.predict(ws[cols])[0]
+        predictor = lambda cols, gam, ws, noise: gam.predict(ws[cols])[0]
     pcaed = {}
     for vs in model:
-        pcaed[vs["name"]] = predictor(vs["vars"], vs["gam"], data)
+        pcaed[vs["name"]] = predictor(vs["vars"], vs["gam"], data, vs["noise"])
     pcaed = pd.DataFrame(pcaed, index=[0])[coef_names]  # ensure correct order
     inv = pcaed @ pca_components
     inv.columns = col_order
