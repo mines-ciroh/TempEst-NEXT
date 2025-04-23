@@ -160,7 +160,7 @@ def build_model_from_data(tr_data):
     """
     vars_local = var_sets.copy()
     # To reduce noise, set "weak-anomaly" dates to their mean.
-    means = tr_data.mean()
+    means = tr_data[col_order].mean()
     fwt = tr_data["FallWinter"].quantile(0.25)
     sst = tr_data["SpringSummer"].quantile(0.25)
     tr_data.loc[tr_data["FallWinter"] < fwt, "FallDay"] = means["FallDay"]
