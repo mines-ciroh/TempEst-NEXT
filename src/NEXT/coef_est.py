@@ -59,7 +59,7 @@ def preprocess(data, allow_no_id=True):
 var_sets = [
     {"name": "PCA0", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'developed', 'ws_canopy', 'cold_prcp', 'prcp_index', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 30, "noise":  0.087},
     {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'slope', 'wetland', 'ice_snow', 'ws_canopy', 'vp_sd', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 30, "noise":  0.036},
-    # {"name": "PCA2", "vars": ['vp', 'elev_min', 'wetland', 'developed', 'water', 'canopy', 'ws_canopy', 'vp_sd', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 324, "noise":  0.004},
+    {"name": "PCA2", "vars": ['vp', 'elev_min', 'wetland', 'developed', 'water', 'canopy', 'ws_canopy', 'vp_sd', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 324, "noise":  0.004},
     # {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'elev_min', 'elev', 'slope', 'water', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7), "lam": 30, "noise":  0.004},
     # {"name": "PCA4", "vars": ['tmax', 'area', 'elev_min', 'elev', 'wetland', 'developed', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + te(8, 9), "lam": 270, "noise":  0.003},
     # {"name": "PCA5", "vars": ['tmax', 'vp', 'elev_min', 'elev', 'slope', 'ice_snow', 'water', 'ws_canopy', 'cold_prcp', 'vp_sd', 'prcp_index', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 270, "noise":  0.002},
@@ -159,6 +159,15 @@ def build_model_from_data(tr_data):
     which will be converted through PCA.
     """
     vars_local = var_sets.copy()
+    # To reduce noise, set "weak-anomaly" dates to their mean.
+    means = tr_data.mean()
+    fwt = tr_data["FallWinter"].quantile(0.25)
+    sst = tr_data["SpringSummer"].quantile(0.25)
+    tr_data.loc[tr_data["FallWinter"] < fwt, "FallDay"] = means["FallDay"]
+    tr_data.loc[tr_data["FallWinter"] < fwt, "WinterDay"] = means["WinterDay"]
+    tr_data.loc[tr_data["SpringSummer"] < sst, "SpringDay"] = means["SpringDay"]
+    tr_data.loc[tr_data["SpringSummer"] < sst, "SummerDay"] = means["SummerDay"]
+    # Resume analysis
     X = tr_data.drop(columns=col_order)
     Y = tr_data[["id"] + col_order].set_index("id")
     Y = (Y - offset) / scale  # normalize scale
