@@ -57,32 +57,17 @@ def preprocess(data, allow_no_id=True):
 
 
 # FWPCA Version
-# var_sets = [
-#     {"name": "PCA0", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'developed', 'ws_canopy', 'cold_prcp', 'prcp_index', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 30, "noise":  0.087},
-#     {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'slope', 'wetland', 'ice_snow', 'ws_canopy', 'vp_sd', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 30, "noise":  0.036},
-#     {"name": "PCA2", "vars": ['vp', 'elev_min', 'wetland', 'developed', 'water', 'canopy', 'ws_canopy', 'vp_sd', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 324, "noise":  0.004},
-#     {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'elev_min', 'elev', 'slope', 'water', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7), "lam": 30, "noise":  0.004},
-#     {"name": "PCA4", "vars": ['tmax', 'area', 'elev_min', 'elev', 'wetland', 'developed', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + te(8, 9), "lam": 270, "noise":  0.003},
-#     {"name": "PCA5", "vars": ['tmax', 'vp', 'elev_min', 'elev', 'slope', 'ice_snow', 'water', 'ws_canopy', 'cold_prcp', 'vp_sd', 'prcp_index', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 270, "noise":  0.002},
-#     {"name": "PCA6", "vars": ['tmax', 'prcp', 'vp', 'area', 'elev_min', 'elev', 'slope', 'wetland', 'ws_canopy', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + s(12) + s(13), "lam": 30, "noise":  0.002},
-#     {"name": "PCA7", "vars": ['tmax', 'vp', 'area', 'wetland', 'water', 'ws_canopy', 'vp_sd', 'prcp_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7), "lam": 30, "noise":  0.002},
-#     {"name": "PCA8", "vars": ['vp', 'area', 'elev', 'ice_snow', 'water', 'frozen', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6), "lam": 47829690, "noise":  0.001},
-# ]
-
-
-# Restriced variables FWPCA
 var_sets = [
-    {"name": "PCA0", "vars": ['tmax', 'vp', 'area', 'elev_min', 'developed', 'frozen', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 10, "noise":  0.094},
-    {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'elev_min', 'slope', 'wetland', 'ws_canopy', 'frozen', 'vp_sd', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9), "lam": 30, "noise":  0.038},
-    # {"name": "PCA2", "vars": ['tmax', 'prcp', 'elev_min', 'slope', 'ice_snow', 'water', 'frozen', 'prcp_phi', 'prcp_index', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9), "lam": 108, "noise":  0.004},
-    # {"name": "PCA3", "vars": ['tmax', 'vp', 'elev_min', 'wetland', 'water', 'frozen', 'cold_prcp', 'vp_sd', 'prcp_phi', 'prcp_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 810, "noise":  0.004},
-    # {"name": "PCA4", "vars": ['tmax', 'vp', 'elev_min', 'slope', 'wetland', 'frozen', 'vp_sd', 'prcp_phi', 'tmax_phi', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + te(9, 10), "lam": 270, "noise":  0.003},
-    # {"name": "PCA5", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'water', 'ws_canopy', 'frozen', 'cold_prcp', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + s(12), "lam": 270, "noise":  0.002},
-    # {"name": "PCA6", "vars": ['tmax', 'prcp', 'vp', 'elev_min', 'slope', 'wetland', 'water', 'ws_canopy', 'cold_prcp', 'vp_sd', 'prcp_phi', 'prcp_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11), "lam": 270, "noise":  0.002},
-    # {"name": "PCA7", "vars": ['tmax', 'area', 'elev_min', 'wetland', 'water', 'frozen', 'vp_sd'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6), "lam": 30, "noise":  0.002},
-    # {"name": "PCA8", "vars": ['elev_min', 'wetland', 'developed', 'ice_snow', 'frozen', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8), "lam": 2430, "noise":  0.001},
+    {"name": "PCA0", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'developed', 'ws_canopy', 'cold_prcp', 'prcp_index', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 30, "noise":  0.087},
+    {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'elev_min', 'elev', 'slope', 'wetland', 'ice_snow', 'ws_canopy', 'vp_sd', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 30, "noise":  0.036},
+    # {"name": "PCA2", "vars": ['vp', 'elev_min', 'wetland', 'developed', 'water', 'canopy', 'ws_canopy', 'vp_sd', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 324, "noise":  0.004},
+    # {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'elev_min', 'elev', 'slope', 'water', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7), "lam": 30, "noise":  0.004},
+    # {"name": "PCA4", "vars": ['tmax', 'area', 'elev_min', 'elev', 'wetland', 'developed', 'prcp_phi', 'tmax_phi', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + te(8, 9), "lam": 270, "noise":  0.003},
+    # {"name": "PCA5", "vars": ['tmax', 'vp', 'elev_min', 'elev', 'slope', 'ice_snow', 'water', 'ws_canopy', 'cold_prcp', 'vp_sd', 'prcp_index', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 270, "noise":  0.002},
+    # {"name": "PCA6", "vars": ['tmax', 'prcp', 'vp', 'area', 'elev_min', 'elev', 'slope', 'wetland', 'ws_canopy', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + s(12) + s(13), "lam": 30, "noise":  0.002},
+    # {"name": "PCA7", "vars": ['tmax', 'vp', 'area', 'wetland', 'water', 'ws_canopy', 'vp_sd', 'prcp_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7), "lam": 30, "noise":  0.002},
+    # {"name": "PCA8", "vars": ['vp', 'area', 'elev', 'ice_snow', 'water', 'frozen', 'tmax_phi'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6), "lam": 47829690, "noise":  0.001},
 ]
-
 
 
 
