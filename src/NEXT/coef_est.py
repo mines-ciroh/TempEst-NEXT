@@ -18,7 +18,7 @@ rand = np.random.default_rng()
 
 inp_cols = ["tmax", "prcp", "srad", "vp",
             "area", "elev_min", "elev", "slope",
-            "forest", "wetland", "developed", "ice_snow", "water",
+            "wetland", "developed", "ice_snow", "water",
             "canopy", "ws_canopy",
             "lat", "lon", "date", "day"]
 req_cols = inp_cols + ["id"]
@@ -42,7 +42,9 @@ def preprocess(data, allow_no_id=True):
     data["frozen"] = data["tmax"] < 0    
     data["cold_prcp"] = data["prcp"] * data["frozen"]
     predictors = data.groupby("id", as_index=False)[
-        inp_cols + ["frozen", "cold_prcp"]].mean().merge(
+        inp_cols + ["frozen", "cold_prcp"]].mean().assign(
+                    snowfrac=lambda x: x["cold_prcp"]/x["prcp"]).drop(
+                    columns=["cold_prcp"]).merge(
         data.groupby("id", as_index=False)[["prcp", "srad", "vp"]].std(),
         on="id", suffixes=["", "_sd"]).merge(
             # Why different grouping?  apply was dropping id
