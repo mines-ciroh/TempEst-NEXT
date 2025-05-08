@@ -117,16 +117,19 @@ def build_model_from_data(tr_data):
     means = tr_data[col_order].mean()
     fwt = tr_data["FallWinter"].quantile(0.25)
     sst = tr_data["SpringSummer"].quantile(0.25)
-    tr_data.loc[tr_data["FallWinter"] < fwt, "FallDay"] = means["FallDay"]
     tr_data.loc[tr_data["FallWinter"] < fwt, "WinterDay"] = means["WinterDay"]
-    tr_data.loc[tr_data["SpringSummer"] < sst, "SpringDay"] = means["SpringDay"]
-    tr_data.loc[tr_data["SpringSummer"] < sst, "SummerDay"] = means["SummerDay"]
+    tr_data["FallDay"] = means["FallDay"]
+    tr_data["SpringDay"] = means["SpringDay"]
+    tr_data["SummerDay"] = means["SummerDay"]
     # Resume analysis
     X = tr_data.drop(columns=col_order)
     Y = tr_data[["id"] + col_order].set_index("id")
     Y = (Y - offset) / scale  # normalize scale
     Y = Y @ np.transpose(pca_components)
     Y.columns = coef_names
+    Y["FallDay"] = 0
+    Y["SpringDay"] = 0
+    Y["SummerDay"] = 0
     for vs in vars_local:
         vs["gam"] = LinearGAM(vs["eq"], lam=vs["lam"]).fit(X[vs["vars"]], Y[vs["name"]])
         vs["noise"] = np.sqrt(np.mean((vs["gam"].predict(X[vs["vars"]]) - Y[vs["name"]])**2))
@@ -144,9 +147,9 @@ def predict_site_coefficients(model, data, draw=False):
     noise_factor = 1.5
     if draw:
         predictor = lambda cols, gam, ws, noise: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
-                                                  rand.normal(scale=noise * noise_factor))
+                                                  rand.normal(scale=noise * noise_factor)) / gam.statistics_['scale']
     else:
-        predictor = lambda cols, gam, ws, noise: gam.predict(ws[cols])[0]
+        predictor = lambda cols, gam, ws, noise: gam.predict(ws[cols])[0] / gam.statistics_['scale']
     pcaed = {}
     for cn in coef_names:
         # For when we don't fit all PCAs.
