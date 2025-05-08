@@ -135,6 +135,7 @@ def build_model_from_data(tr_data):
     for vs in vars_local:
         vs["gam"] = LinearGAM(vs["eq"], lam=vs["lam"]).fit(X[vs["vars"]], Y[vs["name"]])
         vs["noise"] = np.sqrt(np.mean((vs["gam"].predict(X[vs["vars"]]) - Y[vs["name"]])**2))
+        vs["scale"] = Y[vs["name"]].std() / vs["gam"].predict(X[vs["vars"]]).std()
     return vars_local
 
 
@@ -146,12 +147,12 @@ def predict_site_coefficients(model, data, draw=False):
     """
     # Calibrated "fudge factor": if we don't use all the PCs, we don't capture all the noise. Adjust this to get
     # the correct distribution width.
-    noise_factor = 1.0
+    noise_factor = 1.5
     if draw:
         predictor = lambda cols, gam, ws, noise, scale: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
-                                                          rand.normal(scale=noise * noise_factor)) * scale
+                                                          rand.normal(scale=noise * noise_factor))
     else:
-        predictor = lambda cols, gam, ws, noise, scale: gam.predict(ws[cols])[0] * scale
+        predictor = lambda cols, gam, ws, noise, scale: gam.predict(ws[cols])[0]
     pcaed = {}
     for cn in coef_names:
         # For when we don't fit all PCAs.
