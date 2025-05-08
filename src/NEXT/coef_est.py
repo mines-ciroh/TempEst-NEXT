@@ -56,13 +56,15 @@ def preprocess(data, allow_no_id=True):
     return predictors
 
 var_sets = [
-    {"name": "PCA0", "vars": ['tmax', 'prcp', 'vp', 'area', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13) + te(14, 15), "lam": 52, "noise":  0.749},
-    {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'ws_canopy', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 55, "noise":  0.787},
-    {"name": "PCA2", "vars": ['tmax', 'vp', 'slope', 'developed', 'ice_snow', 'water', 'snowfrac', 'prcp_index', 'elev', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + te(9, 10) + te(11, 12), "lam": 120, "noise":  0.705},
-    {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'wetland', 'ice_snow', 'water', 'vp_sd', 'prcp_index', 'tmax_phi', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13), "lam": 300, "noise":  0.660},
-    {"name": "PCA4", "vars": ['tmax', 'slope', 'water', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + te(7, 8) + te(9, 10) + te(11, 12), "lam": 100, "noise":  0.370},
-    {"name": "PCA5", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'prcp_phi', 'frozen', 'elev_min', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + te(12, 13), "lam": 300, "noise":  0.503}
+    {"name": "PCA0", "vars": ['tmax', 'prcp', 'vp', 'area', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13) + te(14, 15), "lam": 52, "noise":  0.749, "scale":  1.16},
+    {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'ws_canopy', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 55, "noise":  0.787, "scale":  1.43},
+    {"name": "PCA2", "vars": ['tmax', 'vp', 'slope', 'developed', 'ice_snow', 'water', 'snowfrac', 'prcp_index', 'elev', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + te(9, 10) + te(11, 12), "lam": 120, "noise":  0.705, "scale":  1.87},
+    {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'wetland', 'ice_snow', 'water', 'vp_sd', 'prcp_index', 'tmax_phi', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13), "lam": 300, "noise":  0.660, "scale":  1.84},
+    {"name": "PCA4", "vars": ['tmax', 'slope', 'water', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + te(7, 8) + te(9, 10) + te(11, 12), "lam": 100, "noise":  0.370, "scale":  1.17},
+    {"name": "PCA5", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'prcp_phi', 'frozen', 'elev_min', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + te(12, 13), "lam": 300, "noise":  0.503, "scale":  1.89}
 ]
+
+
 
 # Shared
 coef_names = ["PCA" + str(i) for i in range(9)]
@@ -144,18 +146,18 @@ def predict_site_coefficients(model, data, draw=False):
     """
     # Calibrated "fudge factor": if we don't use all the PCs, we don't capture all the noise. Adjust this to get
     # the correct distribution width.
-    noise_factor = 1.5
+    noise_factor = 1.0
     if draw:
-        predictor = lambda cols, gam, ws, noise: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
-                                                  rand.normal(scale=noise * noise_factor)) / gam.statistics_['scale']
+        predictor = lambda cols, gam, ws, noise, scale: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
+                                                          rand.normal(scale=noise * noise_factor)) * scale
     else:
-        predictor = lambda cols, gam, ws, noise: gam.predict(ws[cols])[0] / gam.statistics_['scale']
+        predictor = lambda cols, gam, ws, noise, scale: gam.predict(ws[cols])[0] * scale
     pcaed = {}
     for cn in coef_names:
         # For when we don't fit all PCAs.
         pcaed[cn] = 0
     for vs in model:
-        pcaed[vs["name"]] = predictor(vs["vars"], vs["gam"], data, vs["noise"])
+        pcaed[vs["name"]] = predictor(vs["vars"], vs["gam"], data, vs["noise"], vs["scale"])
     pcaed = pd.DataFrame(pcaed, index=[0])[coef_names]  # ensure correct order
     inv = pcaed @ pca_components
     inv.columns = col_order
