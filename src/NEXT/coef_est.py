@@ -56,47 +56,53 @@ def preprocess(data, allow_no_id=True):
     return predictors
 
 var_sets = [
-    {"name": "PCA0", "vars": ['tmax', 'prcp', 'vp', 'area', 'wetland', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev_min', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 90, "noise":  0.819},
-    {"name": "PCA1", "vars": ['tmax', 'vp', 'elev', 'slope', 'wetland', 'developed', 'water', 'ws_canopy', 'frozen', 'snowfrac', 'vp_sd', 'tmax_phi', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + s(12), "lam": 30, "noise":  0.983},
-    {"name": "PCA2", "vars": ['tmax', 'vp', 'ws_canopy', 'snowfrac', 'prcp_phi', 'prcp_index', 'elev_min', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + te(7, 8), "lam": 208, "noise":  0.825},
-    {"name": "PCA3", "vars": ['prcp', 'vp', 'area', 'elev', 'slope', 'wetland', 'developed', 'ice_snow', 'frozen', 'vp_sd', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11), "lam": 949, "noise":  0.766},
-    {"name": "PCA4", "vars": ['tmax', 'prcp', 'area', 'slope', 'developed', 'tmax_phi', 'elev_min', 'canopy', 'ws_canopy', 'tmax_index', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + te(7, 8) + te(9, 10), "lam": 2846, "noise":  0.775},
-    {"name": "PCA5", "vars": ['tmax', 'vp', 'slope', 'wetland', 'ice_snow', 'water', 'snowfrac', 'prcp_phi', 'prcp_index', 'ws_canopy', 'elev_min', 'elev', 'tmax_index', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13), "lam": 300, "noise":  0.711},
-    {"name": "PCA6", "vars": ['tmax', 'vp', 'area', 'slope', 'water', 'snowfrac', 'prcp_phi', 'prcp_index', 'tmax_index', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + te(8, 9), "lam": 100, "noise":  0.462},
-    {"name": "PCA7", "vars": ['tmax', 'prcp', 'vp', 'area', 'ice_snow', 'vp_sd', 'prcp_phi', 'tmax_phi', 'ws_canopy', 'elev_min', 'elev', 'tmax_index', 'frozen'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + te(9, 10) + te(11, 12), "lam": 3000, "noise":  0.559},
-    {"name": "PCA8", "vars": ['tmax', 'vp', 'area', 'developed', 'water', 'snowfrac', 'vp_sd', 'prcp_phi', 'tmax_phi', 'elev', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 300, "noise":  0.496},
+    {"name": "PCA0", "vars": ['tmax', 'prcp', 'vp', 'area', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13) + te(14, 15), "lam": 52, "noise":  0.749},
+    {"name": "PCA1", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'water', 'snowfrac', 'vp_sd', 'tmax_phi', 'elev', 'ws_canopy', 'frozen', 'tmax_index'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + te(11, 12), "lam": 55, "noise":  0.787},
+    {"name": "PCA2", "vars": ['tmax', 'vp', 'slope', 'developed', 'ice_snow', 'water', 'snowfrac', 'prcp_index', 'elev', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + te(9, 10) + te(11, 12), "lam": 120, "noise":  0.705},
+    {"name": "PCA3", "vars": ['tmax', 'prcp', 'vp', 'wetland', 'ice_snow', 'water', 'vp_sd', 'prcp_index', 'tmax_phi', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + te(10, 11) + te(12, 13), "lam": 300, "noise":  0.660},
+    {"name": "PCA4", "vars": ['tmax', 'slope', 'water', 'vp_sd', 'prcp_phi', 'prcp_index', 'tmax_phi', 'elev', 'elev_min', 'frozen', 'tmax_index', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + te(7, 8) + te(9, 10) + te(11, 12), "lam": 100, "noise":  0.370},
+    {"name": "PCA5", "vars": ['tmax', 'vp', 'area', 'slope', 'wetland', 'developed', 'water', 'snowfrac', 'vp_sd', 'prcp_phi', 'frozen', 'elev_min', 'canopy', 'ws_canopy'], "eq": s(0) + s(1) + s(2) + s(3) + s(4) + s(5) + s(6) + s(7) + s(8) + s(9) + s(10) + s(11) + te(12, 13), "lam": 300, "noise":  0.503}
 ]
 
 # Shared
 coef_names = ["PCA" + str(i) for i in range(9)]
 col_order = ['Intercept', 'Amplitude', 'FallDay', 'WinterDay', 'SpringDay',
        'SummerDay', 'SpringSummer', 'FallWinter', 'at_coef']
-offset = pd.Series([ 12.74045259,   8.88225679, 323.98182474,  70.20482269,
-       150.54965511, 218.01908066,   0.73922948,   1.3983637 ,
+offset = pd.Series([ 12.74045259,   8.88225679, 326.75461455,  70.20482269,
+       154.07057546, 217.70684039,   0.73922948,   1.3983637 ,
          0.61015365],
    index=col_order)
-scale = pd.Series([ 3.99350655,  2.72327991, 10.54315388, 24.98668967, 17.37028795,
-       14.80270361,  0.95517945,  0.92035171,  0.16615406],
+scale = pd.Series([ 3.99350655,  2.72327991,  1.        , 24.98668967,  1.        ,
+        1.        ,  0.95517945,  0.92035171,  0.16615406],
                   index=col_order)
 
-pca_components = np.array([[-0.45538956, -0.31404083, -0.10310545, -0.40538516, -0.21287365,
-         0.16529587,  0.42218866, -0.24480047, -0.45631392],
-       [-0.23117283,  0.40309686, -0.39847152, -0.17666709, -0.35069812,
-        -0.49089832,  0.03177782,  0.4769362 , -0.04040952],
-       [ 0.24986664, -0.09583789,  0.57766394, -0.31240809, -0.59769297,
-        -0.11632982, -0.33375202,  0.02184174, -0.12020955],
-       [-0.23641776, -0.40057095,  0.1458864 ,  0.45021412,  0.1756954 ,
-        -0.56431082, -0.19792132,  0.03926654, -0.41187823],
-       [-0.06619692,  0.16363308,  0.5310667 , -0.22536575,  0.45038622,
-         0.06700262,  0.30162264,  0.55538102, -0.17105331],
-       [-0.08221556, -0.10865766,  0.29618724,  0.31313608, -0.303729  ,
-        -0.2391    ,  0.63764204, -0.05527334,  0.4864056 ],
-       [ 0.46765154, -0.64479329, -0.2999677 , -0.3031819 ,  0.1046663 ,
-        -0.16495217,  0.13406052,  0.32033365,  0.15777719],
-       [-0.2966813 ,  0.01218628,  0.12396925, -0.50827357,  0.34718424,
-        -0.41629897, -0.18718909, -0.36389985,  0.4204958 ],
-       [-0.55044853, -0.33876265,  0.02243962,  0.0710974 , -0.13037981,
-         0.37087001, -0.34584401,  0.40502555,  0.37214333]])
+pca_components = np.array([[-4.75654675e-01, -3.53122432e-01, -5.55111512e-17,
+        -3.94265151e-01, -0.00000000e+00, -0.00000000e+00,
+         4.38963144e-01, -2.58179195e-01, -4.84011395e-01],
+       [-2.96737149e-01,  5.77346238e-01,  0.00000000e+00,
+        -3.37987594e-01, -1.38777878e-17,  0.00000000e+00,
+         1.36470307e-01,  6.62367291e-01, -8.38343578e-02],
+       [-1.98611733e-01,  1.10851201e-01,  3.08086889e-15,
+         3.76740053e-01,  9.99200722e-16, -0.00000000e+00,
+         7.32213736e-01, -7.91983289e-02,  5.13734360e-01],
+       [ 4.49651596e-01, -8.58603556e-03,  3.16413562e-15,
+        -7.44913823e-01,  9.15933995e-16,  0.00000000e+00,
+         1.90086148e-01, -1.56310705e-01,  4.26939503e-01],
+       [-3.48498827e-01,  5.96225184e-01,  3.21964677e-15,
+        -9.60257405e-02,  7.77156117e-16,  0.00000000e+00,
+        -2.70471037e-01, -6.57554377e-01,  9.11636696e-02],
+       [-5.67992152e-01, -4.17288498e-01, -4.44089210e-16,
+        -1.55784350e-01, -8.32667268e-17, -0.00000000e+00,
+        -3.78500901e-01,  1.77566621e-01,  5.51537509e-01],
+       [-0.00000000e+00,  7.75647890e-16, -2.06005185e-01,
+        -4.67777530e-16, -2.49364141e-01,  9.46244888e-01,
+         7.49593827e-16, -9.52884011e-16,  1.00875968e-15],
+       [ 0.00000000e+00,  1.89872290e-15, -9.06606093e-01,
+        -1.10633612e-15,  4.12560259e-01, -8.86533946e-02,
+         1.65079296e-15, -2.34190242e-15,  2.26705487e-15],
+       [-0.00000000e+00,  1.40248804e-15, -3.68276059e-01,
+        -8.90472886e-16, -8.76134441e-01, -3.11064602e-01,
+         1.25942530e-15, -1.75960297e-15,  1.77068319e-15]])
 
 
 
