@@ -147,7 +147,7 @@ def predict_site_coefficients(model, data, draw=False):
     """
     # Calibrated "fudge factor": if we don't use all the PCs, we don't capture all the noise. Adjust this to get
     # the correct distribution width.
-    noise_factor = 1.5
+    noise_factor = 1.0
     if draw:
         predictor = lambda cols, gam, ws, noise, scale: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
                                                           rand.normal(scale=noise * noise_factor))
