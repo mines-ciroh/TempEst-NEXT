@@ -139,15 +139,12 @@ def build_model_from_data(tr_data):
     return vars_local
 
 
-def predict_site_coefficients(model, data, draw=False):
+def predict_site_coefficients(model, data, draw=False, noise_factor=0.9):
     """
     Predicts model coefficients using the provided (pre-processed) data for
     a specific site.  Then invert PCA to produce NEWT coefficients.
     If draw is True, generate a random draw.
     """
-    # Calibrated "fudge factor": if we don't use all the PCs, we don't capture all the noise. Adjust this to get
-    # the correct distribution width.
-    noise_factor = 1.0
     if draw:
         predictor = lambda cols, gam, ws, noise, scale: (gam.confidence_intervals(ws[cols], quantiles=[rand.uniform()])[0,0] +
                                                           rand.normal(scale=noise * noise_factor))
