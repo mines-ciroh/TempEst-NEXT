@@ -66,7 +66,6 @@ var_sets = [
 
 
 
-# Shared
 coef_names = ["PCA" + str(i) for i in range(9)]
 col_order = ['Intercept', 'Amplitude', 'FallDay', 'WinterDay', 'SpringDay',
        'SummerDay', 'SpringSummer', 'FallWinter', 'at_coef']
@@ -105,8 +104,6 @@ pca_components = np.array([[-4.75654675e-01, -3.53122432e-01, -5.55111512e-17,
        [-0.00000000e+00,  1.40248804e-15, -3.68276059e-01,
         -8.90472886e-16, -8.76134441e-01, -3.11064602e-01,
          1.25942530e-15, -1.75960297e-15,  1.77068319e-15]])
-
-
 
 
 def build_model_from_data(tr_data):
@@ -182,7 +179,8 @@ def build_training_data(data):
         raise ValueError(f"Missing columns in input data; required: {training_req_cols}")
     coefs = data.groupby("id").apply(lambda x: 
         Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
-        len(x[["day", "temperature"]].dropna()["day"].unique()) >= 181 else None,
+        (len(x[["day", "temperature"]].dropna()["day"].unique()) >= 181) and
+                                     len(x) >= 730 else None,
         include_groups=False)
     coefs.index = coefs.index.get_level_values("id")
     covar = preprocess(data)
