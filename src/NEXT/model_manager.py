@@ -130,12 +130,13 @@ class NEXT(object):
                                                   self.make_components(x, climyears, draw, quantiles)))]
             extcol = []
             if use_climate:
-                extcol = [col for col in coef_est.req_cols]
+                extcol = [col for col in coef_est.req_cols
+                          if not col in Watershed.basic_histcol]
             model = Watershed(season,
                               anom,
                               dailies,
                               climeng,  # engines
-                              [],  # extra columns
+                              extcol,  # extra columns
                               **kwargs
                              )
             self.coefficients = coefs

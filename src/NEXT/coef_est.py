@@ -16,11 +16,11 @@ rand = np.random.default_rng()
 
 # Used: ['slope', 'elev_min', 'elev', 'area', 'intercept', 'srad_sd', 'cold_prcp', 'prcp', 'prcp_sd', 'srad', 'water', 'wetland', 'developed', 'ssn_phi', 'Intercept', 'ice_snow', 'vp_sd', 'lat', 'tamp', 'frozen', 'lon', 'ssn_index', 'forest']
 
-inp_cols = ["tmax", "prcp", "srad", "vp",
+inp_cols = ["tmax", "prcp", "vp",
             "area", "elev_min", "elev", "slope",
             "wetland", "developed", "ice_snow", "water",
             "canopy", "ws_canopy",
-            "lat", "lon", "date", "day"]
+            "date", "day"]
 req_cols = inp_cols + ["id"]
 training_req_cols = req_cols + ["temperature"]
 
