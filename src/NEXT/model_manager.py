@@ -104,6 +104,7 @@ class NEXT(object):
         season = Seasonality(ssn),
         anom = Anomaly(sensitivity=coefs["at_coef"].iloc[0],
                        anomgam=self.anomgam,
+                       anomnoise=self.anomnoise,
                        quantiles=quantiles),
         dailies = at_day.rename(columns={"day": "period",
                                        "mean_tmax": "tmax"})
