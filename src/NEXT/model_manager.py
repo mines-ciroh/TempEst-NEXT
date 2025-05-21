@@ -42,31 +42,35 @@ def fit_anomgam(data, N=500000):
         anom = anom.sample(n=N)
     X = anom[["actemp", "delta_at"]]
     y = anom["delta_st"]
-    return pygam.LinearGAM(pygam.te(0, 1)).fit(X, y)
+    gam = pygam.LinearGAM(pygam.te(0, 1)).fit(X, y)
+    noise = np.sqrt(np.mean((gam.predict(X) - y)**2))
+    return (gam, noise)
     
 
 class NEXT(object):
-    def __init__(self, model, anomgam):
+    def __init__(self, model, anomgam, anomnoise):
         # Initialize with a fully-built coefficient estimator model
         self.model = model
         self.anomgam = anomgam
+        self.anomnoise = anomnoise
         self.newt = None
     
-    def from_preproc_data(data, anomgam):
+    def from_preproc_data(data, anomgam, anomnoise):
         # Initialize from pre-processed data
-        return NEXT(coef_est.build_model_from_data(data), anomgam)
+        return NEXT(coef_est.build_model_from_data(data), anomgam, anomnoise)
     
     def from_data(data):
         # Initialize from raw data
-        anomgam = fit_anomgam(data)
+        (anomgam, anomnoise) = fit_anomgam(data)
         return NEXT.from_preproc_data(
             coef_est.build_training_data(data),
-            anomgam
+            anomgam,
+            anomnoise
             )
     
     def to_pickle(self, file):
         with open(file, 'wb') as f:
-            pickle.dump(NEXT(self.model, self.anomgam), f)
+            pickle.dump(NEXT(self.model, self.anomgam, self.anomnoise), f)
     
     def from_pickle(file):
         with open(file, 'rb') as f:
