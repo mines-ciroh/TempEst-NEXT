@@ -10,6 +10,7 @@ etc.  Mostly a wrapper around coef_est.
 
 import NEXT.coef_est as coef_est
 from NEWT import Watershed, engines
+from NEWT.watershed import Seasonality, Anomaly
 import rtseason as rts
 import pandas as pd
 import pickle
@@ -71,47 +72,71 @@ class NEXT(object):
         with open(file, 'rb') as f:
             return pickle.load(f)
     
+    def make_components(self, data, lookback=0, draw=False, quantiles=None,
+                        internal=False):
+        # Build the three model components Seasonality, Anomaly, and periodics.
+        # Lookback = lookback window in years. 0 for full timeseries.
+        # Internal = return extra components for internal use
+        data = data.copy()
+        if lookback > 0:
+            data = data[-(lookback*365):]
+        data["date"] = pd.to_datetime(data["date"])
+        data["day"] = data["date"].dt.day_of_year
+        pdata = coef_est.preprocess(data)
+        coefs = coef_est.predict_site_coefficients(self.model,
+                                                   pdata,
+                                                   draw)
+        at_day = data.groupby(["day"], as_index=False)["tmax"].mean().rename(columns={"tmax": "mean_tmax"})
+        ssn = rts.ThreeSine(
+            Intercept=coefs["Intercept"].iloc[0],
+            Amplitude=coefs["Amplitude"].iloc[0],
+            SpringSummer=coefs["SpringSummer"].iloc[0],
+            FallWinter=coefs["FallWinter"].iloc[0],
+            SpringDay=coefs["SpringDay"].iloc[0],
+            SummerDay=coefs["SummerDay"].iloc[0],
+            FallDay=coefs["FallDay"].iloc[0],
+            WinterDay=coefs["WinterDay"].iloc[0]
+        )
+        season = Seasonality(ssn),
+        anom = Anomaly(sensitivity=coefs["at_coef"].iloc[0],
+                       anomgam=self.anomgam,
+                       quantiles=quantiles),
+        dailies = at_day.rename(columns={"day": "period",
+                                       "mean_tmax": "tmax"})
+        if internal:
+            return (season, anom, dailies, coefs)
+        return (season, anom, dailies)
+    
     def make_newt(self, data, start_date="2020-01-01", reset=False, use_climate=False,
-                  climyears=0, draw=False, **kwargs):
+                  climyears=0, draw=False, quantiles=None, **kwargs):
         # Build a model using provided site data
         # If draw is True, generate a random draw instead of the main estimate.
         self.use_climate = use_climate
         self.climyears = climyears
         if reset or self.newt is None:
-            data = data.copy()
+            (season, anom, dailies, coefs) = self.make_components(data,
+                                                                  climyears,
+                                                                  draw,
+                                                                  quantiles,
+                                                                  True)
+            climeng = []
             if use_climate:
-                data = data.loc[
-                    data["date"].dt.year >= data["date"].dt.year.max() - climyears
-                    , :]
-            data["date"] = pd.to_datetime(data["date"])
-            data["day"] = data["date"].dt.day_of_year
-            pdata = coef_est.preprocess(data)
-            coefs = coef_est.predict_site_coefficients(self.model,
-                                                       pdata,
-                                                       draw)
-            at_day = data.groupby(["day"], as_index=False)["tmax"].mean().rename(columns={"tmax": "mean_tmax"})
-            ssn = rts.ThreeSine(
-                Intercept=coefs["Intercept"].iloc[0],
-                Amplitude=coefs["Amplitude"].iloc[0],
-                SpringSummer=coefs["SpringSummer"].iloc[0],
-                FallWinter=coefs["FallWinter"].iloc[0],
-                SpringDay=coefs["SpringDay"].iloc[0],
-                SummerDay=coefs["SummerDay"].iloc[0],
-                FallDay=coefs["FallDay"].iloc[0],
-                WinterDay=coefs["WinterDay"].iloc[0]
-            )
-            min_temp = ssn.generate_ts()["actemp"].min()
-            min_temp = min_temp if min_temp > 0 else 0
-            model = Watershed(seasonality=ssn,
-                              at_coef=coefs["at_coef"].iloc[0],
-                              at_day=at_day,
-                              climate_engine=None,
-                              anomgam=self.anomgam,
+                climeng = [(365,
+                            engines.ClimateEngine(lambda x:
+                                                  self.make_components(x, climyears, draw, quantiles)))]
+            extcol = []
+            if use_climate:
+                extcol = [col for col in coef_est.req_cols]
+            model = Watershed(season,
+                              anom,
+                              dailies,
+                              climeng,  # engines
+                              [],  # extra columns
                               **kwargs
                              )
             self.coefficients = coefs
             self.newt = model
-            self.newt.initialize_run(start=start_date)
+            self.newt.initialize_run(period=data["day"].iloc[0])
         return self
     
     def run(self, data, reset=False, **args):
