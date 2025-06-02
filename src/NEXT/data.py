@@ -474,9 +474,10 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
-    buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    # buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
+    # buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     ws_canopy = pd.DataFrame([{"year": year, "ws_canopy": get_canopy(geom, str(year))} for year in range(fyr, lyr)])
+    buf_canopy = ws_canopy.rename(columns={"ws_canopy": "canopy"})
     dynamics["year"] = dynamics["date"].dt.year
     dynamics = dynamics.merge(buf_canopy, on="year"
                               ).merge(ws_canopy, on="year"
