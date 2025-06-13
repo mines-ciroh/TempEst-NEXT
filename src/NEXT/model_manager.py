@@ -59,14 +59,16 @@ class NEXT(object):
     def from_preproc_data(data, coef_yr, history, anomgam, anomnoise):
         # Initialize from pre-processed data
         inpcol = ["id", "Intercept", "Amplitude", "WinterDay"]
-        drywet = engines.WetDryEngine.from_data(data[inpcol], coef_yr[inpcol], history)
+        drywet = engines.WetDryEngine.from_data(data[inpcol], coef_yr[inpcol[1:]], history)
         return NEXT(coef_est.build_model_from_data(data), anomgam, anomnoise, drywet)
     
     def from_data(data):
         # Initialize from raw data
         (anomgam, anomnoise) = fit_anomgam(data)
         data["year"] = data["date"].dt.year + (data["date"].dt.month > 9)
-        coef_yr = data.groupby("year").apply(coef_est.build_training_data, include_groups=False)
+        coef_yr = data.groupby("year").apply(lambda x: Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
+                                                        (len(x[["day", "temperature"]].dropna()["day"].unique()) >= 181) else None,
+                                                        include_groups=False)
         history = data[["id", "date", "year", "tmax", "prcp"]]
         return NEXT.from_preproc_data(
             coef_est.build_training_data(data),

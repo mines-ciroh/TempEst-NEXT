@@ -278,6 +278,9 @@ def buffer(data, buffer):
     return data.to_crs(projstr).buffer(buffer).to_crs(4326)
 
 
+def get_area(geom):
+    return geom.to_crs(projstr).area.rename("area").iloc[0]
+
 def gage_geom(usgs_id):
     # Geometries return (geometry, lat, lon, area in m2)
     # geometry should be a Geopandas, not a raw geometry
