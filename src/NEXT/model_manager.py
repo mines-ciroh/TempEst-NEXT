@@ -70,7 +70,7 @@ class NEXT(object):
         (anomgam, anomnoise) = fit_anomgam(data)
         data["year"] = data["date"].dt.year + (data["date"].dt.month > 9)
         if use_drywet:
-            coef_yr = data.groupby("year").apply(lambda x: Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
+            coef_yr = data.groupby(["id", "year"]).apply(lambda x: Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
                                                         (len(x[["day", "temperature"]].dropna()["day"].unique()) >= 181) else None,
                                                         include_groups=False)
         else:
