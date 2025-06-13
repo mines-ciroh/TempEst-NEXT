@@ -48,7 +48,7 @@ def fit_anomgam(data, N=500000):
     
 
 class NEXT(object):
-    def __init__(self, model, anomgam, anomnoise, drywet):
+    def __init__(self, model, anomgam, anomnoise, drywet=None):
         # Initialize with a fully-built coefficient estimator model
         self.model = model
         self.anomgam = anomgam
@@ -56,31 +56,38 @@ class NEXT(object):
         self.newt = None
         self.drywet = drywet
     
-    def from_preproc_data(data, coef_yr, history, anomgam, anomnoise):
+    def from_preproc_data(data, coef_yr, history, anomgam, anomnoise, use_drywet):
         # Initialize from pre-processed data
         inpcol = ["id", "Intercept", "Amplitude", "WinterDay"]
-        drywet = engines.WetDryEngine.from_data(data[inpcol], coef_yr[inpcol[1:]], history)
+        if use_drywet:
+            drywet = engines.WetDryEngine.from_data(data[inpcol], coef_yr[inpcol[1:]], history)
+        else:
+            drywet = None
         return NEXT(coef_est.build_model_from_data(data), anomgam, anomnoise, drywet)
     
-    def from_data(data):
+    def from_data(data, use_drywet=False):
         # Initialize from raw data
         (anomgam, anomnoise) = fit_anomgam(data)
         data["year"] = data["date"].dt.year + (data["date"].dt.month > 9)
-        coef_yr = data.groupby("year").apply(lambda x: Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
+        if use_drywet:
+            coef_yr = data.groupby("year").apply(lambda x: Watershed.from_data(x).coefs_to_df().drop(columns=["R2", "RMSE"]) if
                                                         (len(x[["day", "temperature"]].dropna()["day"].unique()) >= 181) else None,
                                                         include_groups=False)
+        else:
+            coef_yr = None
         history = data[["id", "date", "year", "tmax", "prcp"]]
         return NEXT.from_preproc_data(
             coef_est.build_training_data(data),
             coef_yr,
             history,
             anomgam,
-            anomnoise
+            anomnoise,
+            use_drywet
             )
     
     def to_pickle(self, file):
         with open(file, 'wb') as f:
-            pickle.dump(NEXT(self.model, self.anomgam, self.anomnoise), f)
+            pickle.dump(NEXT(self.model, self.anomgam, self.anomnoise, self.drywet), f)
     
     def from_pickle(file):
         with open(file, 'rb') as f:
@@ -128,6 +135,8 @@ class NEXT(object):
         # If draw is True, generate a random draw instead of the main estimate.
         self.use_climate = use_climate
         self.climyears = climyears
+        if use_drywet and self.drywet is None:
+            raise ValueError("NEXT.make_newt: If use_drywet is True, drywet must exist.")
         if reset or self.newt is None:
             (season, anom, dailies, coefs) = self.make_components(data,
                                                                   climyears,
