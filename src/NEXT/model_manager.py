@@ -58,7 +58,7 @@ class NEXT(object):
     
     def from_preproc_data(data, coef_yr, history, anomgam, anomnoise, use_drywet):
         # Initialize from pre-processed data
-        inpcol = ["id", "Intercept", "Amplitude", "WinterDay"]
+        inpcol = ["id", "Intercept", "Amplitude", "WinterDay", "FallWinter"]
         if use_drywet:
             drywet = engines.WetDryEngine.from_data(data[inpcol], coef_yr[inpcol[1:]], history)
         else:
