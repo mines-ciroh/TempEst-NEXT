@@ -15,7 +15,7 @@ required data from specified or default sources.
 All retrieval functions provide the required column names, plus a date column,
 except for the geometry and topo functions, which return a dictionary.
 
-Training requirements: ['tmax', 'prcp', 'srad', 'vp', 'area', 'elev_min', 'elev', 'slope', 'forest', 'wetland', 'developed', 'ice_snow', 'water', 'lat', 'lon', 'id', 'temperature']
+Training requirements: ['tmax', 'prcp', 'vp', 'area', 'elev_min', 'elev', 'slope', 'forest', 'wetland', 'developed', 'ice_snow', 'water', 'lat', 'lon', 'id', 'temperature']
 Prediction requirements: everything except temperature
 """
 
@@ -26,6 +26,7 @@ import dataretrieval.nwis as nwis
 from pynhd import NLDI
 import pynhd.pynhd as nhd
 import pydaymet.pydaymet as dym
+import pynldas2.pynldas2 as nldas
 import pygeohydro.nlcd as nlcd
 import py3dep.py3dep as p3d
 import xrspatial
@@ -316,8 +317,8 @@ def merit_geom(merit_id):
 geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom,
             "coordinates": watershed_geom}
 
-# Weather requirements: date, tmax, prcp, srad, vp
-wvars = ["tmax", "prcp", "srad", "vp"]
+# Weather requirements: date, tmax, prcp, vp
+wvars = ["tmax", "prcp", "vp"]
 def weather_daymet(geom, start, end):
     return dym.get_bygeom(geom.geometry.iloc[0], (start, end),
                              variables=wvars).\
@@ -326,8 +327,14 @@ def weather_daymet(geom, start, end):
                 rename(columns={"time": "date"})
 
 def weather_nldas(geom, start, end):
-    # Can't do srad, bit of a problem
-    pass
+    nvars = ["temp", "prcp", "humidity"]
+    rename = {nv: wvars[i] for (i, nv) in enumerate(nvars)}
+    data = nldas.get_bygeom(geom.geometry.iloc[0], start, end, variables=nvars)
+    data["date"] = data.time.dt.date
+    data = data.mean(["x", "y"]).to_pandas().groupby("date", as_index=False).agg({"temp": "max", "prcp": "mean", "humidity": "mean"})
+    data["temp"] = data["temp"] - 273  # K to C
+    data["humidity"] = wfc.sph_to_vp(data["humidity"])  # convert to vapor pressure
+    return data.rename(columns=rename).loc[:, ["date"] + wvars]
 
 
 hrrr_varnames = {
@@ -350,7 +357,12 @@ def weather_hrrr(geom, start, end):
 
 
 def weather_gfs(geom, start, end):
-    return wfc.get_gfs(geom, start)
+    # The "downloaded" version works better, but may not work on Windows.
+    # Only retrieve tmax, since GFS is not suitable for the full timeseires.
+    try:
+        return wfc.get_gfs_downloaded(geom, start, "./gfs_cache")
+    except:
+        return wfc.get_gfs(geom, start)
 
 # HRRR can be used for prediction, but not to build coefficient estimation weather,
 # as HRRR-Zarr doesn't have srad.
