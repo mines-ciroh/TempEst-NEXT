@@ -329,7 +329,7 @@ def weather_daymet(geom, start, end):
 def weather_nldas(geom, start, end):
     nvars = ["temp", "prcp", "humidity"]
     rename = {nv: wvars[i] for (i, nv) in enumerate(nvars)}
-    data = nldas.get_bygeom(geom.geometry.iloc[0], start, end, 4326, variables=nvars)
+    data = nldas.get_bygeom(geom, start, end, 4326, variables=nvars)
     data["date"] = data.time.dt.date
     data = data.mean(["x", "y"]).to_pandas().groupby("date", as_index=False).agg({"temp": "max", "prcp": "mean", "humidity": "mean"})
     data["temp"] = data["temp"] - 273  # K to C
