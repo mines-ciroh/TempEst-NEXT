@@ -37,7 +37,7 @@ import NEXT.wforecast as wfc
 
 tid = "10343500"
 nldi_inst = [None]
-catchments = nhd.NHDPlusHR("catchment")
+# catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 # This is on a river, but there are no gages nearby.
 testco = (-106.2403, 38.5408)
