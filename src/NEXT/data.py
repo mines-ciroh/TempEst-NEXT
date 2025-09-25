@@ -48,6 +48,7 @@ tusgs = "usgs:10343500"
 
 
 def nldi():
+    # Simple wrapper to generate an NLDI instance on demand.
     if nldi_inst[0] is None:
         nldi_inst[0] = NLDI()
     return nldi_inst[0]
@@ -68,9 +69,19 @@ def unroll_coords(reaches):
     return [coords for cl in clists for coords in cl]
 
 
-def get_watershed(coordinates):
+def get_watershed(coordinates: tuple):
     """
     Retrieve watershed shape for a given set of coordinates.
+    
+    Parameters
+    ----------
+    coordinates : (float, float)
+        lon, lat (in E, N)
+    
+    Returns
+    -------
+    (GeoDataFrame, float, float, float)
+        Watershed boundary, lat, lon, area in m2.
     """
     comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
     ws = nldi().get_basins(comid, "comid")
@@ -125,9 +136,9 @@ def centroid(geom):
     Centroid as a Shapely point.
 
     """
-    if type(geom) == pd.Series:
+    if type(geom) is pd.Series:
         geom = geom.geometry
-    if type(geom) == gpd.GeoDataFrame:
+    if type(geom) is gpd.GeoDataFrame:
         geom = geom.geometry.iloc[0]
     return geom.centroid
 
@@ -489,10 +500,10 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    # buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
-    # buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
+    buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     ws_canopy = pd.DataFrame([{"year": year, "ws_canopy": get_canopy(geom, str(year))} for year in range(fyr, lyr)])
-    buf_canopy = ws_canopy.rename(columns={"ws_canopy": "canopy"})
+    # buf_canopy = ws_canopy.rename(columns={"ws_canopy": "canopy"})
     dynamics["year"] = dynamics["date"].dt.year
     dynamics = dynamics.merge(buf_canopy, on="year"
                               ).merge(ws_canopy, on="year"
@@ -510,14 +521,33 @@ def full_data(site, start, end,
     Retrieves all required data for a given site, from start to end.  This
     high-level function allows the user to simply specify sources by name and
     handles the rest.
+
+    Parameters
+    ----------
+    site : str
+        Site identifier, format depending on site type. Examples are a USGS gage ID
+        or a coordinate string of the form "lon:lat".
+    start, end : str
+        either full dates "YYYY-MM-DD" or just years, "YYYY".  If they are just years,
+        then each year will be run individually for weather retrieval.  Why does this
+        matter to a high-level function? Because running one year at a time uses much
+        less memory, so providing years is a good solution if you are running out of memory.
+        They must both be in the same format.
+    site_type, weather, lc, topo : str, optional
+        Specify the type of site and data sources for weather, land cover, and topography.
     
-    start, end are strings, which can be either full dates "YYYY-MM-DD" or just
-    years, "YYYY".  If they are just years, then each year will be run individually
-    for weather retrieval.  Why does this matter to a high-level function?
-    Because running one year at a time uses much less memory, so providing
-    years is a good solution if you are running out of memory.
+    Returns
+    -------
+    DataFrame
+        All required TempEst-NEXT prediction data in a DataFrame for the site.
     
-    Currently, only the default sources are supported.
+    Notes
+    -----
+    Currently supported sources are as follows.
+    site_type: "usgs" (USGS gage ID) or "coordinates" ("lon:lat").
+    weather: "daymet", "nldas", "gfs" (forecasting only), "hrrr".
+    lc: "nlcd"
+    topo: "3dep"
     """
     if (len(start) == 4) != (len(end) == 4):
         raise ValueError("Start and end must both be YYYY or YYYY-MM-DD.  It appears that one year and one full date were provided.")
