@@ -45,7 +45,7 @@ def preprocess(data, allow_no_id=True):
         inp_cols + ["frozen", "cold_prcp"]].mean().assign(
                     snowfrac=lambda x: x["cold_prcp"]/x["prcp"]).drop(
                     columns=["cold_prcp"]).merge(
-        data.groupby("id", as_index=False)[["prcp", "srad", "vp"]].std(),
+        data.groupby("id", as_index=False)[["prcp", "vp"]].std(),
         on="id", suffixes=["", "_sd"]).merge(
             # Why different grouping?  apply was dropping id
             data.groupby("id").apply(ssn_df("prcp"), include_groups=False).reset_index(),
