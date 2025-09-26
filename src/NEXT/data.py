@@ -346,14 +346,14 @@ def weather_nldas(geom, start, end):
     data["date"] = data.time.dt.date
     data = data.mean(["x", "y"]).to_pandas().groupby("date", as_index=False).agg({"temp": "max", "prcp": "mean", "humidity": "mean"})
     data["temp"] = data["temp"] - 273  # K to C
-    data["humidity"] = wfc.sph_to_vp(data["humidity"])  # convert to vapor pressure
+    data["humidity"] = wfc.sphum_to_vp(data["humidity"])  # convert to vapor pressure
     return data.rename(columns=rename).loc[:, ["date"] + wvars]
 
 
 hrrr_varnames = {
     "TMP": ("tmax", lambda x: x.max()),
     "PRATE": ("prcp", lambda x: x.mean() * 3600 * 24)  # mm/s --> mm/day
-    # "SPFH": ("vp", lambda x: wfc.sph_to_vp(x.mean()))  # humidity, but not available at surface.
+    # "SPFH": ("vp", lambda x: wfc.sphum_to_vp(x.mean()))  # humidity, but not available at surface.
     }
 
 def weather_hrrr(geom, start, end):
