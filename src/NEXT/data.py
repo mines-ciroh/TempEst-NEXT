@@ -481,9 +481,11 @@ def geom_static_data(site, site_type, geom, lat, lon,
 
 def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
                    weather="daymet", lc="nlcd",
-                   topo="3dep", obs=None):
+                   topo="3dep", obs=None, buffer_fallback=True):
     # Implements data-retrieval logic for a specified geometry.  See full_data
     # docs.
+    # Extra args: if buffer_fallback is True, then, if buffer retrieval fails,
+    # just use watershed canopy as riparian canopy.
     weather_fn = weather_fns[weather]
     obs_fn = obs_fns[obs] if obs is not None else None
     if site_type not in ["usgs", "comid", "coordinates"]:
@@ -502,10 +504,14 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             ])
         fyr = int(start)
         lyr = int(end) + 1
-    buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
-    buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
     ws_canopy = pd.DataFrame([{"year": year, "ws_canopy": get_canopy(geom, str(year))} for year in range(fyr, lyr)])
-    # buf_canopy = ws_canopy.rename(columns={"ws_canopy": "canopy"})
+    buf_canopy = ws_canopy.rename(columns={"ws_canopy": "canopy"})
+    try:
+        buf = get_upstream_buffer(site, site_type, 1, 0.015, geom=geom)
+        buf_canopy = pd.DataFrame([{"year": year, "canopy": get_canopy(buf, str(year))} for year in range(fyr, lyr)])
+    except Exception as e:
+        if not buffer_fallback:
+            raise e
     dynamics["year"] = dynamics["date"].dt.year
     dynamics = dynamics.merge(buf_canopy, on="year"
                               ).merge(ws_canopy, on="year"
@@ -518,7 +524,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
 
 def full_data(site, start, end,
               site_type="usgs", weather="daymet", lc="nlcd",
-              topo="3dep", obs=None):
+              topo="3dep", obs=None, **kwargs):
     """
     Retrieves all required data for a given site, from start to end.  This
     high-level function allows the user to simply specify sources by name and
@@ -537,6 +543,7 @@ def full_data(site, start, end,
         They must both be in the same format.
     site_type, weather, lc, topo : str, optional
         Specify the type of site and data sources for weather, land cover, and topography.
+    **kwargs : passed to geom_full_data
     
     Returns
     -------
@@ -556,7 +563,7 @@ def full_data(site, start, end,
     geom_fn = geom_fns[site_type]
     (geom, lat, lon, area) = geom_fn(site)
     return geom_full_data(site, site_type, geom, lat, lon, area, start, end,
-                          weather, lc, topo, obs)
+                          weather, lc, topo, obs, **kwargs)
 
 
 def all_data_reaches(coords, dist, buff, start, end, weather="daymet", lc="nlcd",
