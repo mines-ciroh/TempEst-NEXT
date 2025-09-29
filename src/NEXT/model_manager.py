@@ -154,6 +154,8 @@ class NEXT(object):
                 climeng.append((365, self.drywet))
                 if not "prcp" in extcol:
                     extcol.append("prcp")
+                if not "date" in extcol:
+                    extcol.append("date")
             model = Watershed(season,
                               anom,
                               dailies,
