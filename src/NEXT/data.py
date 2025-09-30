@@ -59,10 +59,19 @@ def get_endpoint(lstr):
     return lstr.coords[-1]
 
 
-def unroll_coords(reaches):
+def unroll_coords(reaches: gpd.GeoDataFrame):
     """
-    Reaches is a GeoDataFrame containing linestring geometries (i.e., reaches).
-    Unrolls to extract all coordinate pairs as a list.
+    Extract all coordinate pairs in linestrings as a list.
+
+    Parameters
+    ----------
+    reaches : gpd.GeoDataFrame
+        A GeoDataFrame containing linestring geometries (i.e., reaches).
+    
+    Returns
+    -------
+    list[(float, float)]
+        List of all coordinate pairs.
     """
     # List of lists of coordinates; need to un-nest
     clists = list(reaches.geometry.apply(lambda x: list(x.coords)))
@@ -88,10 +97,20 @@ def get_watershed(coordinates: tuple):
     area = ws.to_crs(projstr).area
     return (ws, coordinates[1], coordinates[0], area.iloc[0])
 
-def watershed_geom(site):
+def watershed_geom(site: str):
     """
     Watershed retriever with appropriate syntax.  Uses a coordinate string
     which is 'lon:lat'.
+
+    Parameters
+    ----------
+    site : str
+        'lon:lat' in E/N, e.g. '-104.123:39.1235'.
+
+    Returns
+    -------
+    (GeoDataFrame, float, float, float)
+        Watershed boundary, lat, lon, area in m2.
     """
     coords = [float(x) for x in site.split(":")]
     return get_watershed(coords)
@@ -99,9 +118,22 @@ def watershed_geom(site):
 
 def get_river(site, site_type, dist):
     """
-    Get river geometry upstream.
-    Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"),
-    or a COMID ("nhd").
+    Get river geometry upstream of a site.
+
+    Parameters
+    ----------
+    site : (float, float) | str
+        Site may be a tuple of (lon, lat) ("coordinates"), a USGS ID ("usgs"), or a COMID ("nhd")
+        with corresponding site_type.
+    site_type : str
+        What kind of site identifier is it? (coordinates, usgs, nhd)
+    dist : number
+        How far upstream should it look, in km?
+
+    Returns
+    -------
+    gpd.GeoDataFrame
+        Upstream river shape
     """
     riv = None
     if site_type == "usgs":
@@ -293,7 +325,19 @@ def buffer(data, buffer):
 def get_area(geom):
     return geom.to_crs(projstr).area.rename("area").iloc[0]
 
-def gage_geom(usgs_id):
+def gage_geom(usgs_id: str):
+    """Get geometry associated with USGS gage ID.
+    
+    Parameters
+    ----------
+    usgs_id : str
+        USGS gage ID (no "USGS-", just the ID part).
+
+    Returns
+    -------
+    (GeoDataFrame, float, float, float)
+        Watershed boundary, lat, lon, area in m2.
+    """
     # Geometries return (geometry, lat, lon, area in m2)
     # geometry should be a Geopandas, not a raw geometry
     shp = nldi().get_basins(usgs_id)
@@ -303,11 +347,13 @@ def gage_geom(usgs_id):
             rc["dec_lat_va"].iloc[0], rc["dec_long_va"].iloc[0], area)
 
 def gpkg_geoms(path, cumulative=False):
-    # Parse geometries from a geopackage, e.g. for reverse-engineering geometries
-    # for an ngen setup
-    # Returns dictionary of: {id: (geometry, lat, lon, area)}
-    # Assumes columns: id, areasqkm (or tot_drainage_areasqkm), geometry
-    # Uses ws area if not cumulative, otherwise total area.
+    """
+    Parse geometries from a geopackage, e.g. for reverse-engineering geometries
+    for an ngen setup
+    Returns dictionary of: {id: (geometry, lat, lon, area)}
+    Assumes columns: id, areasqkm (or tot_drainage_areasqkm), geometry
+    Uses ws area if not cumulative, otherwise total area.
+    """
     df = gpd.read_file(path)
     crs = df.crs
     return {
@@ -370,8 +416,10 @@ def weather_hrrr(geom, start, end):
 
 
 def weather_gfs(geom, start, end):
-    # The "downloaded" version works better, but may not work on Windows.
-    # Only retrieve tmax, since GFS is not suitable for the full timeseires.
+    """
+    The "downloaded" version works better, but may not work on Windows.
+    Only retrieve tmax, since GFS is not suitable for the full timeseires.
+    """
     try:
         return wfc.get_gfs_downloaded(geom, start, "./gfs_cache")
     except:
