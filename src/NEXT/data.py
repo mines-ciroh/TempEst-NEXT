@@ -514,6 +514,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
             raise e
     dynamics["date"] = pd.to_datetime(dynamics["date"])  # just in case
     dynamics["year"] = dynamics["date"].dt.year
+    dynamics["day"] = dynamics["date"].dt.dayofyear
     dynamics = dynamics.merge(buf_canopy, on="year"
                               ).merge(ws_canopy, on="year"
                                       ).drop(columns="year")
