@@ -12,6 +12,8 @@ Install from PyPI: `pip install tempest-next`.  The installed module is called N
 
 ### Data Preparation
 
+**NOTE: Data retrieval is currently a bit spotty because of API changes and other upstream chaos, as the Daymet API that was used is no longer available. NLDAS2 data retrieval (`weather="nldas"`) may or may not work. HRRR data retrieval should work (argument: `weather="hrrr"`). The [HydroShare repository](https://www.hydroshare.org/resource/abdb4e52147e408f9e328a5ba2a155f8/) includes data to replicate the analysis, so the automatic data retrieval tools are not required for testing.**
+
 TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp",
             "area", "elev_min", "elev", "slope",
             "wetland", "developed", "ice_snow", "water",
@@ -46,7 +48,7 @@ NEXT can also predict coefficients without building a model, which can be used t
 
 ## Detailed Documentation
 
-See the [documentation](https://rivertempest.org/next/next.html) at RiverTempest.org.
+See the [documentation](https://rivertempest.org/next/NEXT.html) at RiverTempest.org.
 
 ## Design Overview
 
@@ -60,4 +62,4 @@ NEXT will process an input dataset to estimate model coefficients and will then 
 
 If you use TempEst-NEXT in your research, please cite:
 
-Philippus, Corona and Hogue. "Kilometer-Resolution Daily Stream Water Temperature Modeling and Forecasting for Ungaged Watersheds at the CONUS Scale." In preparation.
+Philippus, Corona and Hogue. "Daily Stream Water Temperature Modeling and Forecasting for Ungaged Watersheds at the CONUS Scale." In review.
