@@ -4,21 +4,21 @@ TempEst-NEXT (stream temperature estimation: near-term expected temperatures) is
 
 NEWT and NEXT are part of the TempEst family of models, including [TempEst 1](https://github.com/mines-ciroh/tempest1) for remote sensing-based monthly mean temperatures and [TempEst 2](https://github.com/mines-ciroh/TempEst2/) for remote sensing-based daily mean and maximum temperatures, both in ungaged watersheds.  TempEst 2 and NEXT have similar functionality, but TempEst-NEXT is capable of forecasting and disturbance modeling, while TempEst 2 is only for historical estimation (but is much faster and uses less data).  TempEst 1/2 are intended for fast analyses of large-domain historical patterns, while NEWT/NEXT are more focused on in-depth analysis of changes over time, as well as forecasting.
 
+The model code is available on [GitHub](https://github.com/mines-ciroh/TempEst-NEXT).
+
 ## Quick Start
 
 ### Installation
 
 Install from PyPI: `pip install tempest-next`.  The installed module is called NEXT: `import NEXT`.
 
+Dependencies: pandas, numpy>=2, TempEst-NEWT, pygam>=0.10, pydaymet>=0.19, pynldas2, dataretrieval, geopandas, pynhd>=0.19, pygeohydro, py3dep, xarray-spatial, s3fs, zarr, cartopy, metpy, getgfs, dask
+
 ### Data Preparation
 
 **NOTE: Data retrieval is currently a bit spotty because of API changes and other upstream chaos, as the Daymet API that was used is no longer available. NLDAS2 data retrieval (`weather="nldas"`) may or may not work. HRRR data retrieval should work (argument: `weather="hrrr"`). The [HydroShare repository](https://www.hydroshare.org/resource/abdb4e52147e408f9e328a5ba2a155f8/) includes data to replicate the analysis, so the automatic data retrieval tools are not required for testing.**
 
-TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp",
-            "area", "elev_min", "elev", "slope",
-            "wetland", "developed", "ice_snow", "water",
-            "canopy", "ws_canopy",
-            "date", "day"]`, with the addition of a "temperature" column if you wish to train a model.
+TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp", "area", "elev_min", "elev", "slope", "wetland", "developed", "ice_snow", "water", "canopy", "ws_canopy", "date", "day"]`, with the addition of a "temperature" column if you wish to train a model.
 
 Column details:
 
@@ -45,6 +45,20 @@ From there, there are three ways to use the resulting NEWT model:
 - Another convenience approach is to simply write the NEWT model as a configuration file, rather than returning a model.  This is useful to prepare a model for later.
 
 NEXT can also predict coefficients without building a model, which can be used to look at stream thermal regimes in general.
+
+Full example with a pre-trained model as `coefs.pickle`:
+
+```
+import NEXT
+
+# Pre-trained model
+model = NEXT.NEXT.from_pickle("coefs.pickle")
+# Or, if you have a training dataset with a `temperature` (observed stream temp.) column...
+model = NEXT.NEXT.from_data(training_data)
+
+inputs = NEXT.data.full_data("10343500", "2015", "2024", weather="nldas")
+prediction = model.run(inputs)
+```
 
 ## Detailed Documentation
 
