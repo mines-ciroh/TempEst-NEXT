@@ -27,6 +27,7 @@ from pynhd import NLDI, WaterData
 import pynhd.pynhd as nhd
 import pydaymet.pydaymet as dym
 import pynldas2.pynldas2 as nldas
+import pygridmet.pygridmet as gridmet
 import pygeohydro.nlcd as nlcd
 import py3dep.py3dep as p3d
 import xrspatial
@@ -48,7 +49,7 @@ tusgs = "usgs:10343500"
 coastco = "-124.06986:46.23899" # mouth of the Columbia
 cctup = (-124.06986, 46.23899)
 
-wbd = WaterData('wbd12')
+wbd = WaterData('wbd08')
 
 def nldi():
     # Simple wrapper to generate an NLDI instance on demand.
@@ -98,7 +99,9 @@ def loop_search_coast(coordinates: tuple, dist: int=100):
 
     """
     try:
-        return wbd.bydistance(coordinates, dist).head(1)
+        # Some watersheds include a bit of off-shore area that breaks weather
+        # retrieval. Buffer inwards to avoid.
+        return wbd.bydistance(coordinates, dist).head(1).buffer(-0.05)
     except nhd.ZeroMatchedError:
         if dist > 1e5:
             raise nhd.ZeroMatchedError("Excessive search radius")
@@ -130,6 +133,8 @@ def get_watershed(coordinates: tuple, allow_coast: bool=True):
             ws = loop_search_coast(coordinates)
         else:
             raise e
+    if type(ws.geometry.iloc[0]) is shp.MultiPolygon:
+        ws = ws.union(ws)
     area = ws.to_crs(projstr).area
     return (ws, coordinates[1], coordinates[0], area.iloc[0])
 
@@ -415,7 +420,9 @@ geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom,
 # Weather requirements: date, tmax, prcp, vp
 wvars = ["tmax", "prcp", "vp"]
 def weather_daymet(geom, start, end):
-    return dym.get_bygeom(geom.geometry.iloc[0], (start, end),
+    if type(geom) is gpd.GeoDataFrame or type(geom) is gpd.GeoSeries:
+        geom = geom.geometry.iloc[0]  # doesn't work with a GDF
+    return dym.get_bygeom(geom, (start, end),
                              variables=wvars).\
         groupby("time", squeeze=False).\
             map(lambda x: x.mean()).to_dataframe()[wvars].reset_index().\
@@ -424,13 +431,25 @@ def weather_daymet(geom, start, end):
 def weather_nldas(geom, start, end):
     nvars = ["temp", "prcp", "humidity"]
     rename = {nv: wvars[i] for (i, nv) in enumerate(nvars)}
-    if type(geom) is gpd.GeoDataFrame:
+    if type(geom) is gpd.GeoDataFrame or type(geom) is gpd.GeoSeries:
         geom = geom.geometry.iloc[0]  # doesn't work with a GDF
     data = nldas.get_bygeom(geom, start, end, variables=nvars)
     data["date"] = data.time.dt.date
     data = data.mean(["x", "y"]).to_pandas().groupby("date", as_index=False).agg({"temp": "max", "prcp": "mean", "humidity": "mean"})
     data["temp"] = data["temp"] - 273  # K to C
     data["humidity"] = wfc.sphum_to_vp(data["humidity"])  # convert to vapor pressure
+    return data.rename(columns=rename).loc[:, ["date"] + wvars]
+
+def weather_gridmet(geom, start, end):
+    nvars = ["tmmx", "pr", "sph"]
+    rename = {nv: wvars[i] for (i, nv) in enumerate(nvars)}
+    if type(geom) is gpd.GeoDataFrame or type(geom) is gpd.GeoSeries:
+        geom = geom.geometry.iloc[0]  # doesn't work with a GDF
+    data = gridmet.get_bygeom(geom, (start, end), variables=nvars)
+    data["date"] = data.time.dt.date
+    data = data.mean(["lat", "lon"]).to_pandas()
+    data["tmmx"] = data["tmmx"] - 273  # K to C
+    data["sph"] = wfc.sphum_to_vp(data["sph"])  # convert to vapor pressure
     return data.rename(columns=rename).loc[:, ["date"] + wvars]
 
 
@@ -466,7 +485,7 @@ def weather_gfs(geom, start, end):
 # HRRR can be used for prediction, but not to build coefficient estimation weather,
 # as HRRR-Zarr doesn't have srad.
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
-        "gfs": weather_gfs, "hrrr": weather_hrrr}
+        "gfs": weather_gfs, "hrrr": weather_hrrr, "gridmet": weather_gridmet}
 
 # lcov requirements: forest, wetland, developed, ice_snow, water
 def lcov_nlcd(geom, start, end):
@@ -566,7 +585,7 @@ def geom_static_data(site, site_type, geom, lat, lon,
 
 
 def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
-                   weather="daymet", lc="nlcd",
+                   weather="gridmet", lc="nlcd",
                    topo="3dep", obs=None, buffer_fallback=True):
     # Implements data-retrieval logic for a specified geometry.  See full_data
     # docs.
@@ -611,7 +630,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
 
 
 def full_data(site, start, end,
-              site_type="usgs", weather="daymet", lc="nlcd",
+              site_type="usgs", weather="gridmet", lc="nlcd",
               topo="3dep", obs=None, **kwargs):
     """
     Retrieves all required data for a given site, from start to end.  This
@@ -654,7 +673,7 @@ def full_data(site, start, end,
                           weather, lc, topo, obs, **kwargs)
 
 
-def all_data_reaches(coords, dist, buff, start, end, weather="daymet", lc="nlcd",
+def all_data_reaches(coords, dist, buff, start, end, weather="gridmet", lc="nlcd",
                   topo="3dep", as_df=False):
     (trib, upper, main) = get_upstream(coords, dist)
     trib["id"] = trib.index
@@ -679,7 +698,7 @@ def all_data_reaches(coords, dist, buff, start, end, weather="daymet", lc="nlcd"
     return (trib_data, upper_data, main_data)
 
 
-def all_data_gpkg(path, start, end, weather="daymet", lc="nlcd",
+def all_data_gpkg(path, start, end, weather="gridmet", lc="nlcd",
                   topo="3dep", obs=None, cumulative=False, handler=lambda k, g, e: None):
     """
     Wraps full_data to get everything for each site in a geopackage at path.

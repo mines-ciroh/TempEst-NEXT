@@ -16,7 +16,7 @@ Dependencies: pandas, numpy>=2, TempEst-NEWT, pygam>=0.10, pydaymet>=0.19, pynld
 
 ### Data Preparation
 
-**NOTE: Data retrieval is currently a bit spotty because of API changes and other upstream chaos, as the Daymet API that was used is no longer available. NLDAS2 data retrieval (`weather="nldas"`) may or may not work. HRRR data retrieval should work (argument: `weather="hrrr"`). The [HydroShare repository](https://www.hydroshare.org/resource/abdb4e52147e408f9e328a5ba2a155f8/) includes data to replicate the analysis, so the automatic data retrieval tools are not required for testing.**
+Note: Daymet and NLDAS2 data retrieval are currently not working due to upstream issues. Gridmet (now set to default) and HRRR should work. The analysis in the paper was carried out using Daymet, so results may not be identical.
 
 TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp", "area", "elev_min", "elev", "slope", "wetland", "developed", "ice_snow", "water", "canopy", "ws_canopy", "date", "day"]`, with the addition of a "temperature" column if you wish to train a model.
 
