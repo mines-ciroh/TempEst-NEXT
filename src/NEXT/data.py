@@ -23,7 +23,7 @@ Prediction requirements: everything except temperature
 import pandas as pd
 # import geopandas as gpd
 import dataretrieval.nwis as nwis
-from pynhd import NLDI
+from pynhd import NLDI, WaterData
 import pynhd.pynhd as nhd
 import pydaymet.pydaymet as dym
 import pynldas2.pynldas2 as nldas
@@ -45,7 +45,10 @@ testco_site = ":".join([str(x) for x in testco])
 testpt = gpd.GeoSeries([shp.Point(testco)], crs=4326)
 tcomid = "918351"
 tusgs = "usgs:10343500"
+coastco = "-124.06986:46.23899" # mouth of the Columbia
+cctup = (-124.06986, 46.23899)
 
+wbd = WaterData('wbd12')
 
 def nldi():
     # Simple wrapper to generate an NLDI instance on demand.
@@ -78,7 +81,31 @@ def unroll_coords(reaches: gpd.GeoDataFrame):
     return [coords for cl in clists for coords in cl]
 
 
-def get_watershed(coordinates: tuple):
+def loop_search_coast(coordinates: tuple, dist: int=100):
+    """
+    Search outwards until watershed is found.
+
+    Parameters
+    ----------
+    coordinates : tuple
+        lon, lat (in E, N)
+    dist : int, optional
+        Search radius in meters. The default is 100.
+
+    Returns
+    -------
+    Watershed shape
+
+    """
+    try:
+        return wbd.bydistance(coordinates, dist).head(1)
+    except nhd.ZeroMatchedError:
+        if dist > 1e5:
+            raise nhd.ZeroMatchedError("Excessive search radius")
+        return loop_search_coast(coordinates, dist*2)
+
+
+def get_watershed(coordinates: tuple, allow_coast: bool=True):
     """
     Retrieve watershed shape for a given set of coordinates.
     
@@ -86,18 +113,27 @@ def get_watershed(coordinates: tuple):
     ----------
     coordinates : (float, float)
         lon, lat (in E, N)
+    allow_coast : bool, optional
+        If True and service returns no features, look for HUC12 watersheds in
+        an increasing radius and use the nearest one. The default is True.
     
     Returns
     -------
     (GeoDataFrame, float, float, float)
         Watershed boundary, lat, lon, area in m2.
     """
-    comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
-    ws = nldi().get_basins(comid, "comid")
+    try:
+        comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
+        ws = nldi().get_basins(comid, "comid")
+    except nhd.ZeroMatchedError as e:
+        if allow_coast:
+            ws = loop_search_coast(coordinates)
+        else:
+            raise e
     area = ws.to_crs(projstr).area
     return (ws, coordinates[1], coordinates[0], area.iloc[0])
 
-def watershed_geom(site: str):
+def watershed_geom(site: str, **kwargs):
     """
     Watershed retriever with appropriate syntax.  Uses a coordinate string
     which is 'lon:lat'.
@@ -106,6 +142,8 @@ def watershed_geom(site: str):
     ----------
     site : str
         'lon:lat' in E/N, e.g. '-104.123:39.1235'.
+    **kwargs
+        Passed to get_watershed.
 
     Returns
     -------
@@ -113,7 +151,7 @@ def watershed_geom(site: str):
         Watershed boundary, lat, lon, area in m2.
     """
     coords = [float(x) for x in site.split(":")]
-    return get_watershed(coords)
+    return get_watershed(coords, **kwargs)
 
 
 def get_river(site, site_type, dist):
