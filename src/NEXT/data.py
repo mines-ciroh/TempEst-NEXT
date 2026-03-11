@@ -82,33 +82,37 @@ def unroll_coords(reaches: gpd.GeoDataFrame):
     return [coords for cl in clists for coords in cl]
 
 
-def loop_search_coast(coordinates: tuple, dist: int=100):
+def search_coast(coordinates: tuple):
     """
-    Search outwards until watershed is found.
+    Use 3DEP to find land (US only).
 
     Parameters
     ----------
     coordinates : tuple
         lon, lat (in E, N)
-    dist : int, optional
-        Search radius in meters. The default is 100.
 
     Returns
     -------
-    Watershed shape
+    New coordinates
 
     """
-    try:
-        # Some watersheds include a bit of off-shore area that breaks weather
-        # retrieval. Buffer inwards to avoid.
-        return wbd.bydistance(coordinates, dist).head(1).buffer(-0.05)
-    except nhd.ZeroMatchedError:
-        if dist > 1e5:
-            raise nhd.ZeroMatchedError("Excessive search radius")
-        return loop_search_coast(coordinates, dist*2)
+    x = coordinates[0]
+    y = coordinates[1]
+    radius = 0.001
+    while radius < 10:
+        # if it hits 10 degrees, it's not finding it
+        if p3d.check_3dep_availability((x-radius, y-radius, x+radius, y+radius))['30m']:
+            break
+        radius *= 2
+    else:
+        raise ValueError(f"No coastline identified within 10 degrees of {coordinates}")
+    pt = shp.Point(x, y)
+    dem = p3d.static_3dep_dem(pt.buffer(radius), 4326, 30)
+    stacked = dem.where(dem.notnull()).stack(notnull=['x', 'y'])["notnull"]
+    return stacked[stacked.notnull()].to_numpy()[0] # first not-null elevation
 
 
-def get_watershed(coordinates: tuple, allow_coast: bool=True):
+def get_watershed(coordinates: tuple, coastal: bool=False):
     """
     Retrieve watershed shape for a given set of coordinates.
     
@@ -116,25 +120,28 @@ def get_watershed(coordinates: tuple, allow_coast: bool=True):
     ----------
     coordinates : (float, float)
         lon, lat (in E, N)
-    allow_coast : bool, optional
-        If True and service returns no features, look for HUC12 watersheds in
-        an increasing radius and use the nearest one. The default is True.
+    coastal : bool, optional
+        If True, search for land and go from there.
     
     Returns
     -------
     (GeoDataFrame, float, float, float)
         Watershed boundary, lat, lon, area in m2.
     """
-    try:
-        comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
-        ws = nldi().get_basins(comid, "comid")
-    except nhd.ZeroMatchedError as e:
-        if allow_coast:
-            ws = loop_search_coast(coordinates)
-        else:
-            raise e
+    if coastal:
+        # Get land coordinates, then do it the regular way
+        return get_watershed(search_coast(coordinates), False)
+    else:
+        try:
+            comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
+            ws = nldi().get_basins(comid, "comid")
+        except:
+            ws = wbd.bydistance(coordinates, 0.001).head(1)
     if type(ws.geometry.iloc[0]) is shp.MultiPolygon:
         ws = ws.union(ws)
+    if type(ws.geometry.iloc[0]) is shp.MultiPolygon:
+        # it didn't work
+        ws = ws.convex_hull
     area = ws.to_crs(projstr).area
     return (ws, coordinates[1], coordinates[0], area.iloc[0])
 
@@ -631,7 +638,7 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
 
 def full_data(site, start, end,
               site_type="usgs", weather="gridmet", lc="nlcd",
-              topo="3dep", obs=None, **kwargs):
+              topo="3dep", obs=None, coastal=False, **kwargs):
     """
     Retrieves all required data for a given site, from start to end.  This
     high-level function allows the user to simply specify sources by name and
@@ -650,6 +657,8 @@ def full_data(site, start, end,
         They must both be in the same format.
     site_type, weather, lc, topo : str, optional
         Specify the type of site and data sources for weather, land cover, and topography.
+    coastal : bool, optional
+        Indicate that the location is coastal. Only works with "coordinates".
     **kwargs : passed to geom_full_data
     
     Returns
@@ -668,7 +677,8 @@ def full_data(site, start, end,
     if (len(start) == 4) != (len(end) == 4):
         raise ValueError("Start and end must both be YYYY or YYYY-MM-DD.  It appears that one year and one full date were provided.")
     geom_fn = geom_fns[site_type]
-    (geom, lat, lon, area) = geom_fn(site)
+    # Unnecessary if-else: most geometries don't accept a `coastal` argument
+    (geom, lat, lon, area) = geom_fn(site, coastal=True) if coastal else geom_fn(site)
     return geom_full_data(site, site_type, geom, lat, lon, area, start, end,
                           weather, lc, topo, obs, **kwargs)
 
