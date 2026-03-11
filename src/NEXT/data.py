@@ -108,7 +108,7 @@ def search_coast(coordinates: tuple):
         raise ValueError(f"No coastline identified within 10 degrees of {coordinates}")
     pt = shp.Point(x, y)
     dem = p3d.static_3dep_dem(pt.buffer(radius), 4326, 30)
-    stacked = dem.where(dem.notnull()).stack(notnull=['x', 'y'])["notnull"]
+    stacked = dem.where(dem > 0).where(dem.notnull()).stack(notnull=['x', 'y'])["notnull"]
     return stacked[stacked.notnull()].to_numpy()[0] # first not-null elevation
 
 
