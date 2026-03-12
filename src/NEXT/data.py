@@ -24,6 +24,7 @@ import pandas as pd
 # import geopandas as gpd
 import dataretrieval.nwis as nwis
 from pynhd import NLDI, WaterData
+from pynhd.nldi import ZeroMatchedError
 import pynhd.pynhd as nhd
 import pydaymet.pydaymet as dym
 import pynldas2.pynldas2 as nldas
@@ -82,34 +83,40 @@ def unroll_coords(reaches: gpd.GeoDataFrame):
     return [coords for cl in clists for coords in cl]
 
 
-def search_coast(coordinates: tuple):
+def search_coast(coordinates: tuple, min_dist=0.01):
     """
-    Use 3DEP to find land (US only).
+    Use NLDI to find the nearest (crudely) land basin.
 
     Parameters
     ----------
     coordinates : tuple
         lon, lat (in E, N)
+    min_dist : float
+        Starting search range in degrees
 
     Returns
     -------
-    New coordinates
+    Nearby inland basin geometry. May return a relatively far-inland basin.
 
     """
+    max_dist = 5
+    steps = 5
     x = coordinates[0]
     y = coordinates[1]
-    radius = 0.001
-    while radius < 10:
-        # if it hits 10 degrees, it's not finding it
-        if p3d.check_3dep_availability((x-radius, y-radius, x+radius, y+radius))['30m']:
-            break
-        radius *= 2
-    else:
-        raise ValueError(f"No coastline identified within 10 degrees of {coordinates}")
-    pt = shp.Point(x, y)
-    dem = p3d.static_3dep_dem(pt.buffer(radius), 4326, 30)
-    stacked = dem.where(dem > 0).where(dem.notnull()).stack(notnull=['x', 'y'])["notnull"]
-    return stacked[stacked.notnull()].to_numpy()[0] # first not-null elevation
+    # Steps in four directions out to various distances. Builds outwards,
+    # so the first results are guaranteed to be nearer.
+    offsets = [(x + xd*dist, y + yd*dist)
+               for dist in min_dist*np.arange(0, steps)
+               for xd in [-1, 0, 1]
+               for yd in [-1, 0, 1]]
+    try:
+        res = nldi().comid_byloc(offsets)
+        comid = res["comid"].iloc[0]
+        return nldi().get_basins(comid, fsource="comid").head(1)
+    except ZeroMatchedError:
+        if min_dist * steps < max_dist:
+            return search_coast(coordinates, min_dist * steps)
+        raise ValueError(f"No NLDI points within {max_dist} deg of {coordinates}")
 
 
 def get_watershed(coordinates: tuple, coastal: bool=False):
@@ -129,8 +136,8 @@ def get_watershed(coordinates: tuple, coastal: bool=False):
         Watershed boundary, lat, lon, area in m2.
     """
     if coastal:
-        # Get land coordinates, then do it the regular way
-        return get_watershed(search_coast(coordinates), False)
+        # Get land watershed
+        ws = search_coast(coordinates)
     else:
         try:
             comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
