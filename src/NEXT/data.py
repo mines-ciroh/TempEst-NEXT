@@ -36,6 +36,7 @@ import numpy as np
 import geopandas as gpd
 import shapely as shp
 import NEXT.wforecast as wfc
+import warnings
 
 tid = "10343500"
 nldi_inst = [None]
@@ -110,8 +111,10 @@ def search_coast(coordinates: tuple, min_dist=0.01):
                for xd in [-1, 0, 1]
                for yd in [-1, 0, 1]]
     try:
-        res = nldi().comid_byloc(offsets)
-        comid = res["comid"].iloc[0]
+        with warnings.catch_warnings(action="ignore"):
+            # NLDI warns about no-result points, which is unhelpful here
+            res = nldi().comid_byloc(offsets)
+            comid = res["comid"].iloc[0]
         return nldi().get_basins(comid, fsource="comid").head(1)
     except ZeroMatchedError:
         if min_dist * steps < max_dist:
