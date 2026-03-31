@@ -122,7 +122,9 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
         ctr = basin.geometry.iloc[0].centroid.coords[0]
         coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
         series = data.interp(coords)
-    return op(series.groupby("date")).to_series().rename(new_name) - offset
+    res = op(series.groupby("date")).to_series().rename(new_name) - offset
+    data.close()
+    return res
     
 
 def get_gfs_timestep(fcst, time, lat, lon, varbs):
