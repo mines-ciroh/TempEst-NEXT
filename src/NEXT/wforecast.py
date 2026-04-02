@@ -88,10 +88,44 @@ def download_gfs_gribs(start, basepath, time="06", until=384, res="0p25"):
         urq.urlretrieve(url, basepath + f"GFS_{res}_{start}_{time}_h{timestep}.grib")
 
         
-def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = lambda x: x.max(), step_type="instant"):
+def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_name="tmax", op = lambda x: x.max(), step_type="instant"):
     """
-    This works better than get_gfs, but it requires ecCodes and therefore won't run on Windows.
+    Retrieve GFS forecast data by downloading the entire forecast and subsetting
+    it. This is relatively fast and reliable, but memory-intensive and requires
+    support for cfgrib.
+
+    Parameters
+    ----------
+    basin : GeoSeries | GeoDataFrame
+        Geometry/ies for which to retrieve GFS data. If there are multiple rows,
+        there should be an `id` column.
+    start : str | datetime
+        Start date; date on which forecast was run. Format: "YYYYMMDD".
+        Alternatively, may be a Pandas or Python datetime object or anything
+        which can be converted to such (e.g., 'today').
+    basepath : str, optional
+        Directory to which to download/find individual GFS outputs and compiled
+        NetCDFs. The default is './gfs_cache/'.
+    var : str, optional
+        Variable to retrieve (GFS name). The default is "t2m".
+    new_name : str, optional
+        Output variable name. The default is "tmax".
+    op : function series -> number, optional
+        Temporal summary function. The default is lambda x: x.max().
+    step_type : str, optional
+        GFS step type for variables other than air temp. The default is "instant".
+
+    Returns
+    -------
+    res : pd.Series
+        Series of output variable (new_name), indexed by date and (if applicable) ID.
+    
+    Notes
+    -----
+    This works better than get_gfs, but it requires ecCodes and therefore may not work on Windows.
     """
+    if not (type(start) is str and start.isnumeric()):
+        start = pd.to_datetime(start).strftime("%Y%m%d")
     if not basepath.endswith('/'):
         basepath = basepath + '/'
     offset = 273 if var == "t2m" else 0
@@ -114,14 +148,23 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
     data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
     # data["date"] = data["time"].to_series().dt.normalize()
     data = data.assign_coords(date = ("time", data["time"].to_series().dt.normalize()))
-    try:
-        clip = data.rio.clip(basin.geometry)
-        series = clip.groupby("time").mean(dim=["latitude", "longitude"])
-    except:  # no data in bounds - watershed too small.  Interpolate to centroid instead.
-        ctr = basin.geometry.iloc[0].centroid.coords[0]
-        coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
-        series = data.interp(coords)
-    res = op(series.groupby("date")).to_series().rename(new_name) - offset
+    def pull_data(geom, df):
+        try:
+            clip = data.rio.clip(basin.geometry)
+            series = clip.groupby("time").mean(dim=["latitude", "longitude"])
+        except:  # no data in bounds - watershed too small.  Interpolate to centroid instead.
+            ctr = basin.geometry.iloc[0].centroid.coords[0]
+            coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
+            series = data.interp(coords)
+        res = op(series.groupby("date")).to_series().rename(new_name) - offset
+        if df:
+            return pd.DataFrame(res)
+        else:
+            return res
+    if len(basin) == 1:
+        res = pull_data(basin, False)
+    else:
+        res = basin.groupby('id').apply(pull_data, include_groups=False, df=True)
     data.close()
     return res
     
