@@ -16,8 +16,6 @@ Dependencies: pandas, numpy>=2, TempEst-NEWT, pygam>=0.10, pydaymet>=0.19, pynld
 
 ### Data Preparation
 
-Note: Daymet and NLDAS2 data retrieval are currently not working due to upstream issues. Gridmet (now set to default) and HRRR should work. The analysis in the paper was carried out using Daymet, so results may not be identical.
-
 TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp", "area", "elev_min", "elev", "slope", "wetland", "developed", "ice_snow", "water", "canopy", "ws_canopy", "date", "day"]`, with the addition of a "temperature" column if you wish to train a model.
 
 Column details:
@@ -33,6 +31,14 @@ Column details:
 - slope: mean watershed slope (m/m)
 - wetland, developed, ice_snow, water: land cover abundances in the watershed as a proportion (e.g., wetland=0.2)
 - canopy, ws_canopy: mean forest canopy cover as a proportion (e.g., 0.8) for the riparian zone and the whole watershed, respectively
+
+Note: Daymet and NLDAS2 data retrieval are currently not working due to upstream issues. Gridmet (now set to default) works. The analysis in the paper was carried out using Daymet, so results may not be identical.
+
+For forecast data, past and present HRRR works (except, in historical data, for humidity, which must be retrieved through Gridmet), but has become very slow for unknown reasons. It is quick enough for actual forecasting use, but for historical (coefficient estimation) data, I recommend using a shorter sample of HRRR data to adjust Gridmet climatology. Gridmet is far faster.
+
+For forecasting only (no long-term archives), GFS works well, but is rather memory-intensive, provided that your system supports `cfgrib` (which has experimental support for Windows, but mainly tagets Linux). Otherwise, it uses a native Python implementation which may work, but is slow and rather unreliable.
+
+If built-in solutions are not working or unsuitable, they are not essential to using TempEst-NEXT. Any method that produces the above input columns is suitable, and semi-bespoke techniques are often preferable for specific workflows. For example, while the [national temperature forecasting demo](https://github.com/mines-ciroh/natl-temp-forecast) uses all TempEst-NEXT functions, it does *not* rely entirely on `full_data`, with direct calls to `weather_hrrr` and `get_gfs_downloaded`.
 
 ### Model Generation and Execution
 

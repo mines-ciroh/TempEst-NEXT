@@ -30,8 +30,12 @@ hrrr_projection = ccrs.LambertConformal(central_longitude=262.5,
                                         globe=ccrs.Globe(semimajor_axis=6371229,
                                                          semiminor_axis=6371229))
 
+# start = time(); data = weather_hrrr(tbas[0], "2025-01-01", '2025-12-31'); delta = time() - start
+# Pre-edit reference time (Sagehen, weather_hrrr 2025, ~900 Mbps down): 13.5 min
+# Post-edit: 13 min, so no real difference
 
-def get_hrrr(date, var="TMP", operator=lambda x: x.max()):
+
+def get_hrrr(date, basin, var="TMP", operator=lambda x: x.max()):
     """
     Retrieve a full forecast run as an xarray.
     date: YYYYMMDD, using the 06z run (which should roughly correspond to day-of in US timezones)
@@ -54,15 +58,9 @@ def get_hrrr(date, var="TMP", operator=lambda x: x.max()):
     ds = ds.rename(projection_x_coordinate="x", projection_y_coordinate="y").\
         metpy.assign_crs(hrrr_projection.to_cf()).\
         metpy.assign_latitude_longitude()
+    ds = ds.rio.write_crs(hrrr_projection).rio.clip(basin.geometry.values, basin.crs)
     ds = ds[var] - offset
     return operator(ds[:-1, :, :].groupby("time", squeeze=False))
-
-
-def hrrr_watershed_clip(forecast, basin):
-    """
-    Clip forecast output to a watershed.
-    """
-    return forecast.rio.write_crs(hrrr_projection).rio.clip(basin.geometry.values, basin.crs)
 
 
 def hrrr_areal_summary(basin, date, var, new_name, time_operator, 
@@ -71,9 +69,8 @@ def hrrr_areal_summary(basin, date, var, new_name, time_operator,
     Generate areal summary of a selected forecast, grouped by time.
     """
     try:
-        forecast = get_hrrr(date, var, time_operator)
-        clipped_fcst = hrrr_watershed_clip(forecast, basin)
-        summary = clipped_fcst.groupby("time", squeeze=False).\
+        forecast = get_hrrr(date, basin, var, time_operator)
+        summary = forecast.groupby("time", squeeze=False).\
             map(areal_operator).to_pandas().rename(new_name)
         return pd.DataFrame({"date": summary.index, new_name: summary})
     except Exception as e:
@@ -95,6 +92,8 @@ def get_gfs_downloaded(basin, start, basepath, var="t2m", new_name="tmax", op = 
     """
     This works better than get_gfs, but it requires ecCodes and therefore won't run on Windows.
     """
+    if not basepath.endswith('/'):
+        basepath = basepath + '/'
     offset = 273 if var == "t2m" else 0
     if start == "today":
         start = pd.to_datetime(np.datetime64("today")).strftime("%Y%m%d")

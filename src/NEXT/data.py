@@ -37,9 +37,11 @@ import geopandas as gpd
 import shapely as shp
 import NEXT.wforecast as wfc
 import warnings
+import os
 
 tid = "10343500"
 nldi_inst = [None]
+wbd_inst = [None]
 # catchments = nhd.NHDPlusHR("catchment")
 projstr = "+proj=lcc +lat_1=25 +lat_2=60 +lat_0=42.5 +lon_0=-100 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
 # This is on a river, but there are no gages nearby.
@@ -51,7 +53,11 @@ tusgs = "usgs:10343500"
 coastco = "-124.06986:46.23899" # mouth of the Columbia
 cctup = (-124.06986, 46.23899)
 
-wbd = WaterData('wbd08')
+def wbd():
+    # Wrapper to generate a WBD instance on demand.
+    if wbd_inst[0] is None:
+        wbd_inst[0] = WaterData('wbd08')
+    return wbd_inst[0]
 
 def nldi():
     # Simple wrapper to generate an NLDI instance on demand.
@@ -146,7 +152,7 @@ def get_watershed(coordinates: tuple, coastal: bool=False):
             comid = nldi().comid_byloc(coordinates)["comid"].iloc[0]
             ws = nldi().get_basins(comid, "comid")
         except:
-            ws = wbd.bydistance(coordinates, 0.001).head(1)
+            ws = wbd().bydistance(coordinates, 0.001).head(1)
     if type(ws.geometry.iloc[0]) is shp.MultiPolygon:
         ws = ws.union(ws)
     if type(ws.geometry.iloc[0]) is shp.MultiPolygon:
@@ -494,8 +500,11 @@ def weather_gfs(geom, start, end):
     The "downloaded" version works better, but may not work on Windows.
     Only retrieve tmax, since GFS is not suitable for the full timeseires.
     """
+    start = pd.to_datetime(start).strftime("%Y%m%d")
     try:
-        return wfc.get_gfs_downloaded(geom, start, "./gfs_cache")
+        if not os.path.exists('./gfs_cache'):
+            os.mkdir('./gfs_cache')
+        return wfc.get_gfs_downloaded(geom, start, "./gfs_cache/")
     except:
         return wfc.get_gfs(geom, start)
 
