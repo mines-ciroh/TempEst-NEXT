@@ -144,6 +144,8 @@ def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_nam
     data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
     # data["date"] = data["time"].to_series().dt.normalize()
     data = data.assign_coords(date = ("time", data["time"].to_series().dt.normalize()))
+    data.coords['longitude'] = (data.coords['longitude'] + 180) % 360 - 180
+    data = data.sortby(['latitude', 'longitude'])  # non-sortedness gets weird
     def proc_series(series):
         return op(series.groupby("date")).to_series().rename(new_name) - offset
     def pull_data(geom, df, allow_interp):
@@ -153,7 +155,7 @@ def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_nam
         except:  # no data in bounds - watershed too small.  Fall back to interpolation.
             if allow_interp:
                 ctr = basin.geometry.iloc[0].centroid.coords[0]
-                coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
+                coords = {"longitude": ctr[0], "latitude": ctr[1]}  # GFS uses positive degrees east
                 series = data.interp(coords)
             else:
                 return None
@@ -165,14 +167,14 @@ def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_nam
     if len(basin) == 1:
         res = pull_data(basin, False, True)
     else:
-        # Assume multi-basins are small
+        # Bulk application of clip is a huge memory problem, so use centroids.
         basin['ctr'] = basin.centroid
         interp = data.interp({"latitude": basin['ctr'].y,
-                              "longitude": basin['ctr'].x % 360})
+                              "longitude": basin['ctr'].x})
         res = basin.groupby('id').apply(
             lambda x: pd.DataFrame(proc_series(
                 interp.loc[{'latitude': x['ctr'].iat[0].y,
-                            'longitude': x['ctr'].iat[0].x % 360}]
+                            'longitude': x['ctr'].iat[0].x}]
                 )).reset_index(),
             include_groups=False
             ).reset_index().loc[:, ['id', 'date', new_name]]
