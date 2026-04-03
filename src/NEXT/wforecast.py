@@ -30,10 +30,6 @@ hrrr_projection = ccrs.LambertConformal(central_longitude=262.5,
                                         globe=ccrs.Globe(semimajor_axis=6371229,
                                                          semiminor_axis=6371229))
 
-# start = time(); data = weather_hrrr(tbas[0], "2025-01-01", '2025-12-31'); delta = time() - start
-# Pre-edit reference time (Sagehen, weather_hrrr 2025, ~900 Mbps down): 13.5 min
-# Post-edit: 13 min, so no real difference
-
 
 def get_hrrr(date, basin, var="TMP", operator=lambda x: x.max()):
     """
@@ -148,23 +144,38 @@ def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_nam
     data = data.rio.write_crs(4326)  # wgs84.  Don't think it matters much at quarter-degree resolution.
     # data["date"] = data["time"].to_series().dt.normalize()
     data = data.assign_coords(date = ("time", data["time"].to_series().dt.normalize()))
-    def pull_data(geom, df):
+    def proc_series(series):
+        return op(series.groupby("date")).to_series().rename(new_name) - offset
+    def pull_data(geom, df, allow_interp):
         try:
             clip = data.rio.clip(basin.geometry)
             series = clip.groupby("time").mean(dim=["latitude", "longitude"])
-        except:  # no data in bounds - watershed too small.  Interpolate to centroid instead.
-            ctr = basin.geometry.iloc[0].centroid.coords[0]
-            coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
-            series = data.interp(coords)
-        res = op(series.groupby("date")).to_series().rename(new_name) - offset
+        except:  # no data in bounds - watershed too small.  Fall back to interpolation.
+            if allow_interp:
+                ctr = basin.geometry.iloc[0].centroid.coords[0]
+                coords = {"longitude": ctr[0] % 360, "latitude": ctr[1]}  # GFS uses positive degrees east
+                series = data.interp(coords)
+            else:
+                return None
+        res = proc_series(series)
         if df:
             return pd.DataFrame(res)
         else:
             return res
     if len(basin) == 1:
-        res = pull_data(basin, False)
+        res = pull_data(basin, False, True)
     else:
-        res = basin.groupby('id').apply(pull_data, include_groups=False, df=True)
+        # Assume multi-basins are small
+        basin['ctr'] = basin.centroid
+        interp = data.interp({"latitude": basin['ctr'].y,
+                              "longitude": basin['ctr'].x % 360})
+        res = basin.groupby('id').apply(
+            lambda x: pd.DataFrame(proc_series(
+                interp.loc[{'latitude': x['ctr'].iat[0].y,
+                            'longitude': x['ctr'].iat[0].x % 360}]
+                )).reset_index(),
+            include_groups=False
+            ).reset_index().loc[:, ['id', 'date', new_name]]
     data.close()
     return res
     
