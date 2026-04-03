@@ -124,6 +124,8 @@ def get_gfs_downloaded(basin, start, basepath='./gfs_cache/', var="t2m", new_nam
         start = pd.to_datetime(start).strftime("%Y%m%d")
     if not basepath.endswith('/'):
         basepath = basepath + '/'
+    if not os.path.exists(basepath):
+        os.mkdir(basepath)
     offset = 273 if var == "t2m" else 0
     if start == "today":
         start = pd.to_datetime(np.datetime64("today")).strftime("%Y%m%d")
