@@ -21,6 +21,8 @@ import warnings
 import getgfs as gfs
 import urllib.request as urq
 import os
+import dynamical_catalog as dyn
+
 
 
 # Direct copy-paste from https://mesowest.utah.edu/html/hrrr/zarr_documentation/html/zarr_HowToDownload.html
@@ -199,6 +201,10 @@ def sphum_to_vp(q, p=1e5):
     # Convert specific humidity, in kg/kg, to vapor pressure.
     return q*p / (0.622 + 0.378 * q)
 
+def dpt_to_vp(dpt):
+    # Convert dewpoint to vapor pressure
+    return 611 * np.exp(7.5 * dpt / (237.3 + dpt))
+
 
 def get_gfs(basin, date, varbs=["tmp2m", "spfh2m", "dswrfsfc", "pratesfc"],
             new_names=["tmax", "vp", "srad", "prcp"],
@@ -238,3 +244,58 @@ def hrrr_series(basin, dates, var, new_name, operator):
         raw = pd.concat([hrrr_areal_summary(basin, date, var, new_name, operator)
             for date in dates])
         return raw.groupby("date").first()
+    
+    
+def weather_dynamical(geom, start, end, name, items, proj, maxlead,
+                      dims=["x", "y"]):
+    """
+    Generic retriever for weather data from the dynamical.org catalog.
+
+    Parameters
+    ----------
+    geom : pd.GeoDataFrame or similar
+        Basin geometry
+    start : str | np.datetime64
+        Start time recognizable by numpy.
+    end : str | np.datetime64
+        End time recognizable by numpy.
+    name : str
+        Name of the dataset in dynamical.org (https://dynamical.org/catalog).
+    items : dict {str: (str, function)}
+        Variables to seek. Key is dynamical.org variable name. First value
+        is the output name, e.g., "tmax". Second value converts a NumPy timeseries
+        to a single final value (e.g., mean, max, unit conversions).
+    proj : str
+        Projection string.
+    maxlead : int
+        Maximum lead time in days.
+    dims : [str]
+        List of spatial (or other averaging) dimensions.
+    Returns
+    -------
+    pd.DataFrame
+        Date and all variables specified by "items".
+
+    """
+    dataset = dyn.open(name)
+    geom = geom.to_crs(proj).geometry  # rio-friendly geometry in relevant proj
+    one = np.timedelta64(1, "D")
+    start = np.datetime64(start)
+    end = np.datetime64(end)
+    dates = pd.Series(np.arange(start, end + one))
+    today = np.datetime64("today")
+    # for each date, we want that day's HRRR run unless it is after today.
+    # Then we want the shortest applicable forecast.
+    if dates.max() > today + one * maxlead:
+        raise ValueError("Max lead time exceeded")
+    timings = [(
+        date, slice("0D", "0D")
+        ) for date in dates if date <= today] + [(
+            today, slice("0D", date - today))
+            for date in dates if date > today]
+    return pd.DataFrame([
+        {"date": init} | {
+            name: fn(dataset.sel(init_time=init, lead_time=lead)[k].
+               rio.clip(geom).mean(dims).compute().to_numpy())
+        for (k, (name, fn)) in items.items()}
+        for (init, lead) in timings])

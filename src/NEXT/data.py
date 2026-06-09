@@ -38,6 +38,7 @@ import shapely as shp
 import NEXT.wforecast as wfc
 import warnings
 import os
+import rioxarray
 
 tid = "10343500"
 nldi_inst = [None]
@@ -482,7 +483,7 @@ hrrr_varnames = {
     # "SPFH": ("vp", lambda x: wfc.sphum_to_vp(x.mean()))  # humidity, but not available at surface.
     }
 
-def weather_hrrr(geom, start, end):
+def weather_hrrr_archive(geom, start, end):
     start = np.datetime64(start)
     end = np.datetime64(end)
     dates = pd.Series(np.arange(start, end + np.timedelta64(1, "D")))
@@ -493,6 +494,45 @@ def weather_hrrr(geom, start, end):
                         hrrr_varnames[var][1])
         for var in hrrr_varnames
         ], axis=1).reset_index()
+
+dynhrrr_varnames = {
+    "temperature_2m": ("tmax", lambda x: x.max()),
+    "precipitation_surface": ("prcp", lambda x: x[1:].mean() * 3600 * 24),  # mm/s --> mm/day
+    "dew_point_temperature_2m": ("vp", lambda x: wfc.dpt_to_vp(x.mean()))
+    }
+
+def weather_hrrr(geom, start, end):
+    return wfc.weather_dynamical(geom, start, end,
+                                 "noaa-hrrr-forecast-48-hour",
+                                 dynhrrr_varnames,
+                                 projstr,
+                                 1)
+
+gefs_varnames = {
+    "temperature_2m": ("tmax", lambda x: x.max()),
+    "precipitation_surface": ("prcp", lambda x: x[1:].mean() * 3600 * 24),  # mm/s --> mm/day
+    # Needs conversion, but we do that in the function since temp is relevant
+    "relative_humidity_2m": ("vp", lambda x: x.mean())
+    }
+
+def weather_gefs(geom, start, end, _keep_going=True):
+    """ Uses the mean over ensemble members, for now. """
+    try:
+        result = wfc.weather_dynamical(geom, start, end,
+                                     "noaa-gefs-forecast-35-day",
+                                     gefs_varnames,
+                                     "4326",
+                                     34,
+                                     ["latitude", "longitude", "ensemble_member"])
+        # RH to vapor pressure using saturated vapor pressure
+        result['vp'] = result['vp'] * wfc.dpt_to_vp(result['tmax'])
+        return result
+    except rioxarray.exceptions.NoDataInBounds:
+        # Try buffering for coarser datasets
+        return weather_gefs(
+            geom.to_crs(projstr).buffer(10000).to_crs(geom.crs),
+            start, end, False  # only try once
+            )
 
 
 def weather_gfs(geom, start, end):
@@ -511,7 +551,8 @@ def weather_gfs(geom, start, end):
 # HRRR can be used for prediction, but not to build coefficient estimation weather,
 # as HRRR-Zarr doesn't have srad.
 weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
-        "gfs": weather_gfs, "hrrr": weather_hrrr, "gridmet": weather_gridmet}
+        "gfs": weather_gfs, "hrrr": weather_hrrr, "gridmet": weather_gridmet,
+        "gefs": weather_gefs}
 
 # lcov requirements: forest, wetland, developed, ice_snow, water
 def lcov_nlcd(geom, start, end):

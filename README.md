@@ -34,7 +34,7 @@ Column details:
 
 Note: Daymet and NLDAS2 data retrieval are currently not working due to upstream issues. Gridmet (now set to default) works. The analysis in the paper was carried out using Daymet, so results may not be identical.
 
-For forecast data, past and present HRRR works (except, in historical data, for humidity, which must be retrieved through Gridmet), but has become very slow for unknown reasons. It is quick enough for actual forecasting use, but for historical (coefficient estimation) data, I recommend using a shorter sample of HRRR data to adjust Gridmet climatology. Gridmet is far faster.
+For forecast data, past and present HRRR works, but is relatively slow. It is quick enough for actual forecasting use, but for historical (coefficient estimation) data, I recommend using a shorter sample of HRRR data to adjust Gridmet climatology. Gridmet is far faster. (HRRR is now quite a bit faster using the Dynamical.org catalog, but Gridmet is still the faster option.)
 
 For forecasting only (no long-term archives), GFS works well, but is rather memory-intensive, provided that your system supports `cfgrib` (which has experimental support for Windows, but mainly tagets Linux). Otherwise, it uses a native Python implementation which may work, but is slow and rather unreliable.
 
