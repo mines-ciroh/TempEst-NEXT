@@ -525,7 +525,7 @@ def weather_gefs(geom, start, end, _keep_going=True):
                                      34,
                                      ["latitude", "longitude", "ensemble_member"])
         # RH to vapor pressure using saturated vapor pressure
-        result['vp'] = result['vp'] * wfc.dpt_to_vp(result['tmax'])
+        result['vp'] = result['vp']/100 * wfc.dpt_to_vp(result['tmax'])
         return result
     except rioxarray.exceptions.NoDataInBounds:
         # Try buffering for coarser datasets
