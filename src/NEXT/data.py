@@ -438,7 +438,7 @@ def merit_geom(merit_id):
     # I don't know if this is straightforwardly doable, but useful for non-CONUS.
     pass
 
-geom_fns = {"usgs": gage_geom, "nhd": nhd_geom, "merit": merit_geom,
+geom_fns = {"usgs": gage_geom, 
             "coordinates": watershed_geom}
 
 # Weather requirements: date, tmax, prcp, vp
@@ -550,7 +550,7 @@ def weather_gfs(geom, start, end):
 
 # HRRR can be used for prediction, but not to build coefficient estimation weather,
 # as HRRR-Zarr doesn't have srad.
-weather_fns = {"daymet": weather_daymet, "nldas": weather_nldas,
+weather_fns = {#"daymet": weather_daymet, "nldas": weather_nldas,
         "gfs": weather_gfs, "hrrr": weather_hrrr, "gridmet": weather_gridmet,
         "gefs": weather_gefs}
 
@@ -629,7 +629,7 @@ def topo_3dep(geom, area):
 def topo_merit(geom):
     pass
 
-topo_fns = {"3dep": topo_3dep, "merit": topo_merit}
+topo_fns = {"3dep": topo_3dep}
 
 def obs_usgs(usgs_id, start, end):
     # Observed temperature
