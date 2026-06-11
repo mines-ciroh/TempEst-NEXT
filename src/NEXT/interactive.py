@@ -15,6 +15,7 @@ import pickle
 from NEXT import data
 import pandas as pd
 import argparse
+import sys
 
 next_url = "https://github.com/mines-ciroh/TempEst-NEXT/raw/refs/heads/master/coefs.pickle"
 
@@ -41,8 +42,9 @@ def get_model(cache=None, url=next_url, overwrite=False):
         if os.path.exists(cache):
             return NEXT.from_pickle(cache)
     # No stored model.
-    with request.urlopen(url) as req:
-        model = pickle.loads(req.read())
+    req = request.urlopen(url)
+    model = pickle.loads(req.read())
+    req.close()
     if cache is not None:
         if overwrite or os.path.exists(cache):
             model.to_pickle(cache)
@@ -145,6 +147,7 @@ def run(site_type=None, site=None, lat=None, lon=None, start=None, end=None,
     print(predictions)
     predictions.to_csv(output)
     print(f"Done; results are in {output}")
+    sys.exit()
 
 
 def parser():
