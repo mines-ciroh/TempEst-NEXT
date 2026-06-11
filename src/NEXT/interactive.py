@@ -14,6 +14,7 @@ from NEXT import NEXT
 import pickle
 from NEXT import data
 import pandas as pd
+import argparse
 
 next_url = "https://github.com/mines-ciroh/TempEst-NEXT/raw/refs/heads/master/coefs.pickle"
 
@@ -144,5 +145,29 @@ def run(site_type=None, site=None, lat=None, lon=None, start=None, end=None,
     print(predictions)
     predictions.to_csv(output)
     print(f"Done; results are in {output}")
-        
+
+
+def parser():
+    ap = argparse.ArgumentParser(
+        description="TempEst-NEXT Command Line\n"
+        "Carry out full TempEst-NEXT model runs from the "
+            "terminal/command prompt with no code. "
+            "All arguments are optional, with missing values requested "
+            "interactively. Site ID and lat/lon are mutually exclusive ("
+            "lat/lon will be ignored if site ID is provided).")
+    for (name, (desc, opts, default)) in descs.items():
+        name = "--" + name
+        ap.add_argument(name, choices=opts, required=False, default=default,
+                        help=desc)
+    return ap
+
+
+def cmdrun():
+    args = parser().parse_args()
+    run(**vars(args))
+
+if __name__ == "__main__":
+    # Test args
+    # --site_type usgs --site 10343500 --start 2024-01-01 --end 2025-12-31 --modpath cache.pickle --datafile sagehen.csv --output sagehen_pred.csv
+    cmdrun()
 

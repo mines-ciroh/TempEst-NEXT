@@ -14,6 +14,12 @@ Install from PyPI: `pip install tempest-next`.  The installed module is called N
 
 Dependencies: pandas, numpy>=2, TempEst-NEWT, pygam>=0.10, pydaymet>=0.19, pynldas2, dataretrieval, geopandas, pynhd>=0.19, pygeohydro, py3dep, xarray-spatial, s3fs, zarr, cartopy, metpy, getgfs, dask
 
+### Instant Command Line Use
+
+All of the below requirements are automated under certain assumptions and can be used directly through the command line or interactive use. After installing TempEst-NEXT as above, just open a terminal/command line and run: `tempest-next` (or `NEXT`, or, if those aren't on your path, `python -m NEXT`). This will interactively request all required information to automatically run the model for a given site (currently, pour point coordinates or a USGS gage ID), including forecasts. (Note that forecast data retrieval is rather slow, and the model does need at least a few years of data to predict well. Future updates will include the option to combine forecast data with climatology-adjusted historical estimates, which are much faster to retrieve.)
+
+You can also pre-specify arguments instead of providing them interactively, which also means you can automate large-scale NEXT runs through the command line (or high-performance computing jobs, etc). To see all arguments, run `tempest-next --help`.
+
 ### Data Preparation
 
 TempEst-NEXT provides automatic tools for data retrieval, for example: `NEXT.data.full_data("-105.1235:40.5723", start="2020", end="2024", site_type="coordinates")`. You can also provide an input data frame. Required columns are `["id", "tmax", "prcp", "vp", "area", "elev_min", "elev", "slope", "wetland", "developed", "ice_snow", "water", "canopy", "ws_canopy", "date", "day"]`, with the addition of a "temperature" column if you wish to train a model.
