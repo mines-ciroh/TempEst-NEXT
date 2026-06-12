@@ -16,6 +16,9 @@ from NEXT import data
 import pandas as pd
 import argparse
 import sys
+import tkinter as tk
+from tkinter.filedialog import askopenfilename
+import matplotlib.pyplot as plt
 
 next_url = "https://github.com/mines-ciroh/TempEst-NEXT/raw/refs/heads/master/coefs.pickle"
 
@@ -150,6 +153,58 @@ def run(site_type=None, site=None, lat=None, lon=None, start=None, end=None,
     sys.exit()
 
 
+
+
+class GUI(tk.Frame):
+    browse = ['modpath', 'datafile', 'output']
+    def __init__(self, master):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+        self.setup()
+    def setup(self):
+        self.entries = {}
+        self.values = {}
+        self.createEntries()
+    def createEntries(self):
+        self.entryFrame = tk.Frame(self)
+        tk.Label(self.entryFrame, text="Note: lat/lon are only needed if site_type=coordinates")
+        self.gridFrame = tk.Frame(self.entryFrame)
+        for (ix, (name, (desc, opts, default))) in enumerate(descs.items()):
+            tk.Label(self.gridFrame, text=f"[{name}] " + desc + ":").grid(row=ix)
+            if opts is None:
+                self.entries[name] = tk.StringVar(self.master)
+                entry = tk.Entry(self.gridFrame, width=30, textvariable=self.entries[name])
+                entry.grid(row=ix, column=1)
+                if name in self.values:
+                    # Keep previous value
+                    self.entries[name].set(self.values[name])
+                if name in self.browse:
+                    tk.Button(self.gridFrame, text="Browse",
+                              command=lambda: self.entries[name].set(askopenfilename())).grid(row=ix, column=2)
+            else:
+                self.entries[name] = tk.StringVar(self.master)
+                if name in self.values:
+                    self.entries[name].set(self.values[name])
+                else:
+                    self.entries[name].set(opts[0] if default is None else default)
+                tk.OptionMenu(self.gridFrame, self.entries[name], *opts).grid(row=ix, column=1)
+        self.gridFrame.pack()
+        tk.Button(self.entryFrame, text="Run", command=self.run).pack(side="bottom")
+        self.entryFrame.pack()
+    def run(self):
+        for (k, v) in self.entries.items():
+            self.values[k] = v.get()
+        self.entryFrame.destroy()
+        self.resultFrame = tk.Frame(self)
+        tk.Label(self.resultFrame, text=str(self.values)).pack()
+        def reset():
+            self.resultFrame.destroy()
+            self.createEntries()
+        tk.Button(self.resultFrame, text="Return", command=reset).pack()
+        self.resultFrame.pack()
+
+
 def parser():
     ap = argparse.ArgumentParser(
         description="TempEst-NEXT Command Line\n"
@@ -157,7 +212,8 @@ def parser():
             "terminal/command prompt with no code. "
             "All arguments are optional, with missing values requested "
             "interactively. Site ID and lat/lon are mutually exclusive ("
-            "lat/lon will be ignored if site ID is provided).")
+            "lat/lon will be ignored if site ID is provided).\n"
+            "To launch a GUI instead, run NEXT --gui")
     for (name, (desc, opts, default)) in descs.items():
         name = "--" + name
         ap.add_argument(name, choices=opts, required=False, default=default,
@@ -168,9 +224,16 @@ def parser():
 def cmdrun():
     args = parser().parse_args()
     run(**vars(args))
+    
+def gui():
+    mainframe = tk.Frame(tk.Tk())
+    gui = GUI(mainframe)
+    mainframe.master.title("TempEst-NEXT GUI")
+    mainframe.pack()
+    gui.mainloop()
 
-if __name__ == "__main__":
-    # Test args
-    # --site_type usgs --site 10343500 --start 2024-01-01 --end 2025-12-31 --modpath cache.pickle --datafile sagehen.csv --output sagehen_pred.csv
-    cmdrun()
+# if __name__ == "__main__":
+#     # Test args
+#     # --site_type usgs --site 10343500 --start 2024-01-01 --end 2025-12-31 --modpath cache.pickle --datafile sagehen.csv --output sagehen_pred.csv
+#     cmdrun()
 

@@ -14,6 +14,10 @@ Install from PyPI: `pip install tempest-next`.  The installed module is called N
 
 Dependencies: pandas, numpy>=2, TempEst-NEWT, pygam>=0.10, pydaymet>=0.19, pynldas2, dataretrieval, geopandas, pynhd>=0.19, pygeohydro, py3dep, xarray-spatial, s3fs, zarr, cartopy, metpy, getgfs, dask
 
+### GUI
+
+`NEXTapp` or `NEXT --gui` launches a graphical interface.
+
 ### Instant Command Line Use
 
 All of the below requirements are automated under certain assumptions and can be used directly through the command line or interactive use. After installing TempEst-NEXT as above, just open a terminal/command line and run: `tempest-next` (or `NEXT`, or, if those aren't on your path, `python -m NEXT`). This will interactively request all required information to automatically run the model for a given site (currently, pour point coordinates or a USGS gage ID), including forecasts. (Note that forecast data retrieval is rather slow, and the model does need at least a few years of data to predict well. Future updates will include the option to combine forecast data with climatology-adjusted historical estimates, which are much faster to retrieve.)
