@@ -17,7 +17,7 @@ import pandas as pd
 import argparse
 import sys
 import tkinter as tk
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import asksaveasfilename
 import matplotlib.pyplot as plt
 
 next_url = "https://github.com/mines-ciroh/TempEst-NEXT/raw/refs/heads/master/coefs.pickle"
@@ -49,7 +49,7 @@ def get_model(cache=None, url=next_url, overwrite=False):
     model = pickle.loads(req.read())
     req.close()
     if cache is not None:
-        if overwrite or os.path.exists(cache):
+        if overwrite or not os.path.exists(cache):
             model.to_pickle(cache)
     return model
 
@@ -105,8 +105,8 @@ descs = {
     "site": ("Numeric site ID (no prefix; e.g., 10343500)", None, None),
     "lat": ("Pour point latitude (Decimal degrees North, e.g. 40.623)", None, None),
     "lon": ("Pour point longitude (Decimal degrees East, e.g. -120.1)", None, None),
-    "start": ("Start date (yyyy-mm-dd)", None, "2001-01-01"),
-    "end": ("End date (yyyy-mm-dd)", None, "2020-12-31"),
+    "start": ("Start date (yyyy-mm-dd)", None, None),
+    "end": ("End date (yyyy-mm-dd)", None, None),
     "weather": ("Weather data source", list(data.weather_fns), "gridmet"),
     "model": ("Pre-trained model URL (optional)", None,
               next_url),
@@ -150,13 +150,13 @@ def run(site_type=None, site=None, lat=None, lon=None, start=None, end=None,
     print(predictions)
     predictions.to_csv(output)
     print(f"Done; results are in {output}")
-    sys.exit()
+    return predictions
 
 
 
 
 class GUI(tk.Frame):
-    browse = ['modpath', 'datafile', 'output']
+    browse = {k: None for k in ['modpath', 'datafile', 'output']}
     def __init__(self, master):
         super().__init__(master)
         self.master = master
@@ -176,12 +176,11 @@ class GUI(tk.Frame):
                 self.entries[name] = tk.StringVar(self.master)
                 entry = tk.Entry(self.gridFrame, width=30, textvariable=self.entries[name])
                 entry.grid(row=ix, column=1)
-                if name in self.values:
+                if name in self.values and self.values[name] is not None:
                     # Keep previous value
                     self.entries[name].set(self.values[name])
                 if name in self.browse:
-                    tk.Button(self.gridFrame, text="Browse",
-                              command=lambda: self.entries[name].set(askopenfilename())).grid(row=ix, column=2)
+                    self.browse[name] = ix
             else:
                 self.entries[name] = tk.StringVar(self.master)
                 if name in self.values:
@@ -189,20 +188,81 @@ class GUI(tk.Frame):
                 else:
                     self.entries[name].set(opts[0] if default is None else default)
                 tk.OptionMenu(self.gridFrame, self.entries[name], *opts).grid(row=ix, column=1)
+        # For some reason, building the browse buttons with a for loop messes
+        # up the targets. We have to hard-code them.
+        def browseButton(row, target):
+            (tk.Button(self.gridFrame, text="Browse",
+                       command=lambda: target.set(asksaveasfilename(confirmoverwrite=False))).
+             grid(row=row, column=2))
+        for k in self.browse:
+            browseButton(self.browse[k], self.entries[k])
         self.gridFrame.pack()
-        tk.Button(self.entryFrame, text="Run", command=self.run).pack(side="bottom")
+        tk.Button(self.entryFrame, text="Run [Note: GUI will become unresponsive until model run is complete]",
+                  command=self.run).pack(side="bottom")
         self.entryFrame.pack()
     def run(self):
         for (k, v) in self.entries.items():
-            self.values[k] = v.get()
+            self.values[k] = res if (res := v.get()) else descs[k][2]
         self.entryFrame.destroy()
-        self.resultFrame = tk.Frame(self)
-        tk.Label(self.resultFrame, text=str(self.values)).pack()
-        def reset():
-            self.resultFrame.destroy()
-            self.createEntries()
-        tk.Button(self.resultFrame, text="Return", command=reset).pack()
-        self.resultFrame.pack()
+        self.validate()
+        if self.ok:
+            self.resultFrame = tk.Frame(self)
+            tk.Label(self.resultFrame,
+                     text=f"Done. Results are in {self.values['output']}. Args:").pack()
+            varGrid = tk.Frame(self.resultFrame)
+            for (ix, (k, v)) in enumerate(self.values.items()):
+                tk.Label(varGrid, text=k + ": ").grid(row=ix, column=0)
+                tk.Label(varGrid, text=v).grid(row=ix, column=1)
+            varGrid.pack()
+            def reset():
+                self.resultFrame.destroy()
+                self.createEntries()
+            tk.Button(self.resultFrame, text="Return", command=reset).pack()
+            self.resultFrame.pack()
+            result = run(**self.values)
+            fig, axes = plt.subplots(1, 2, layout='compressed',
+                                     figsize=(8, 6))
+            result.plot(x='date', y='prediction', ax=axes[0])
+            axes[0].set_xlabel('Date')
+            axes[0].set_ylabel('Mean Stream Temperature [degC]')
+            axes[0].set_title('Full Predicted Timeseries')
+            result.iloc[-30:].plot(x='date', y='prediction', ax=axes[1])
+            axes[1].set_xlabel('Date')
+            axes[1].set_title('Last 30 Days')
+            plt.show()
+    def validate(self):
+        # Check that all required inputs are present.
+        bad = False
+        missing = []
+        # Things that are unconditionally required
+        simple_mandatory = ["output", "start", "end"]
+        for entry in simple_mandatory:
+            if self.values[entry] is None:
+                bad = True
+                missing.append(entry)
+        if (self.values['site_type'] != 'coordinates' and
+            self.values['site'] is None):
+            bad = True
+            missing.append('site')
+        if (self.values['site_type'] == 'coordinates' and
+            (self.values['lat'] is None or self.values['lon'] is None)):
+            bad = True
+            missing.append('lat')
+            missing.append('lon')
+        self.ok = not bad
+        if bad:
+            # If not bad, we don't do anything.
+            def reentry():
+                self.missingFrame.destroy()
+                self.createEntries()
+            self.missingFrame = tk.Frame(self)
+            tk.Label(self.missingFrame,
+                     text="Error: the following values are missing. Please "
+                     "fill in all required fields.").pack()
+            for entry in missing:
+                tk.Label(self.missingFrame, text=f"{entry} ({descs[entry][0]})").pack()
+            tk.Button(self.missingFrame, text="OK - Return", command=reentry).pack()
+            self.missingFrame.pack()
 
 
 def parser():
@@ -213,7 +273,7 @@ def parser():
             "All arguments are optional, with missing values requested "
             "interactively. Site ID and lat/lon are mutually exclusive ("
             "lat/lon will be ignored if site ID is provided).\n"
-            "To launch a GUI instead, run NEXT --gui")
+            "To launch a GUI instead, run NEXT --gui or NEXTapp")
     for (name, (desc, opts, default)) in descs.items():
         name = "--" + name
         ap.add_argument(name, choices=opts, required=False, default=default,
@@ -222,8 +282,12 @@ def parser():
 
 
 def cmdrun():
-    args = parser().parse_args()
-    run(**vars(args))
+    if len(sys.argv) > 1 and sys.argv[1] == "--gui":
+        gui()
+    else:
+        args = parser().parse_args()
+        run(**vars(args))
+        sys.exit()
     
 def gui():
     mainframe = tk.Frame(tk.Tk())
