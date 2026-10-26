@@ -779,3 +779,85 @@ def all_data_gpkg(path, start, end, weather="gridmet", lc="nlcd",
             yield (k, geom_full_data(k, "geopackage", v[0], v[1], v[2], v[3], start, end, weather=weather, lc=lc, topo=topo))
         except Exception as e:
             yield (k, handler(k, v[0], e))
+
+
+def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
+    """
+    Recursively build the network for a given outflow watershed, also storing
+    all subnetworks for further analysis.
+
+    Parameters
+    ----------
+    start : Any
+        Starting point ID.
+    pairs : list of tuples of 2, same type as start
+        (from, to) pairs.
+    toset : set of the same type as start, optional
+        All "to" values. Will be built if unspecified.
+    cache : dictionary, optional
+        All previously-built return dictionaries, if such exist.
+    rlist : Boolean, optional
+        Return a list? Otherwise, just the dictionary.
+
+    Returns
+    -------
+    tuple of (list, dictionary)
+        The list is all upstream watersheds, including start.
+        The dictionary is equivalent lists for each upstream watershed,
+        used to cache previous results. This excludes the watershed itself.
+    """
+    if toset is None:
+        toset = set([x[1] for x in pairs])
+    if not start in toset:
+        # base case: it's not downstream of anything
+        return ([start], {start: []}) if rlist else {start: []}
+    upstreams = [p[0] for p in pairs if p[1] == start]
+    outset = set(upstreams)
+    outdict = cache
+    # build the full dictionary
+    for up in upstreams:
+        if not up in outdict:
+            for (k, v) in recurse_network(up, pairs, toset, cache, rlist=False).items():
+                outdict[k] = v
+    # now update the set
+    for k in upstreams:
+        for itm in outdict[k]:
+            outset.add(itm)
+    outlist = list(outset)
+    outdict[start] = outlist
+    outlist = [start] + outlist
+    return (outlist, outdict) if rlist else outdict
+
+
+def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
+                   identifier: str = 'id', tocol: str = 'to') -> pd.DataFrame:
+    """
+    Converts an input dataset with nested watersheds (individually) into
+    an input dataset where downstream watersheds use area-weighted upstream inputs.
+    This allows larger watershed models to be efficiently built from smaller
+    ones.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Input dataset with required predictor columns, e.g., the output from
+        full_data, for multiple sites.
+    tofrom : pd.DataFrame
+        DataFrame containing flow information. Required columns are the identifier
+        column and the tocol column. Column names specified by argument, defaults
+        "id" and "to".
+    identifier : str, optional
+        Site identifier column in tofrom. Default: "id".
+    tocol : str, optional
+        Column specifying where a watershed flows to in tofrom. Default: "to".
+
+    Returns
+    -------
+    pd.DataFrame
+        Like data, but switched to area-weighted setup for nesting. Also adds
+        columns "upcount" (total upstream watershed) and "uporder" (Strahler
+        stream order where a headwaters watershed equals first-order).
+    """
+    # First, we build a mapping from tofrom to decide what is included. We do
+    # this recursively, but need to be smart about caching.
+    pass
