@@ -392,6 +392,8 @@ def buffer(data, buffer):
 def get_area(geom):
     return geom.to_crs(projstr).area.rename("area").iloc[0]
 
+
+
 def gage_geom(usgs_id: str):
     """Get geometry associated with USGS gage ID.
     
@@ -660,11 +662,13 @@ def geom_full_data(site, site_type, geom, lat, lon, area, start, end,
     # just use watershed canopy as riparian canopy.
     weather_fn = weather_fns[weather]
     obs_fn = obs_fns[obs] if obs is not None else None
+    init_name = site
     if site_type not in ["usgs", "comid", "coordinates"]:
         # For weird stuff like geopackage, just switch it to the coordinates
         site = f"{lon}:{lat}"
         site_type = "coordinates"
     statics = geom_static_data(site, site_type, geom, lat, lon, area)
+    statics['id'] = init_name
     if len(start) > 4:
         dynamics = weather_fn(geom, start, end)
         fyr = pd.to_datetime(start).year
@@ -829,6 +833,62 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
     return (outlist, outdict) if rlist else outdict
 
 
+def wsweights(start, data: pd.DataFrame, mapping: dict, identifier: str = 'id',
+              indexOn: str = 'date',
+              useCols: list = ["tmax", "prcp", "vp",
+                          "elev", "slope",
+                          "wetland", "developed", "ice_snow", "water",
+                          "ws_canopy"],
+              usePour: dict = ['elev_min', 'canopy'],
+              keepContext: bool = True) -> pd.DataFrame:
+    """
+    Compute weighted upstream conditions for a specific watershed and upstream watersheds.
+
+    Parameters
+    ----------
+    start : Any
+        ID of the watershed being solved for.
+    data : pd.DataFrame
+        Watershed input data containing identifier and indexOn columns. All other
+        columns should be numeric. Must contain an area column.
+    mapping : dict
+        Dictionary of watershed identifier --> [upstream watersheds].
+    identifier : str, optional
+        Name of the identifier column. The default is 'id'.
+    indexOn : str, optional
+        Name of the column to align on. The default is 'date'.
+    useCols : list of str, optional
+        Columns to compute weighted outputs for, excluding usePour and 'area'.
+    usePour : list, optional
+        Columns for which to just use the outlet watershed value.
+        The default is ['elev_min', 'canopy'].
+    keepContext : bool, optional
+        If true, merge back in anything that wasn't included.
+
+    Returns
+    -------
+    pd.DataFrame
+        Weighted input DataFrame.
+    """
+    usews = mapping[start]
+    relevant = data.loc[data[identifier].isin(usews)]
+    totArea = relevant.groupby(identifier)['area'].mean().sum()
+    pours = (relevant.loc[relevant[identifier] == start].
+             groupby(indexOn)[usePour].mean())
+    pours[identifier] = start
+    doweight = relevant[[indexOn, 'area'] + useCols].copy()
+    for col in useCols:
+        doweight[col] = doweight[col] * doweight['area']
+    weighted = doweight.groupby(indexOn)[useCols].mean() / totArea
+    result = pours.join(weighted).assign(area = totArea).reset_index()
+    if keepContext:
+        return (data.loc[data[identifier] == start].drop(
+            columns=['area'] + usePour + useCols).merge(
+                result, on=[identifier, indexOn]))
+    return result
+    
+
+
 def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
                    identifier: str = 'id', tocol: str = 'to') -> pd.DataFrame:
     """
@@ -860,4 +920,16 @@ def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
     """
     # First, we build a mapping from tofrom to decide what is included. We do
     # this recursively, but need to be smart about caching.
-    pass
+    toset = set(tofrom[tocol])
+    mapping = {}
+    pairs = list(tofrom[[identifier, tocol]].itertuples(index=False))
+    for ident in tofrom[identifier]:
+        mapping = recurse_network(ident, pairs, toset, mapping, rlist=False)
+    for k in mapping:
+        mapping[k].append(k)
+    # mapping is now a dictionary of site identifier --> [upstream identifiers]
+    # Now we can use wsweights to combine everything.
+    return pd.concat([
+        wsweights(start, data, mapping)
+        for start in data['id'].unique()
+        ])
