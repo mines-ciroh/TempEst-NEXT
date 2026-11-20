@@ -840,12 +840,12 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
     maxing out recursion depth for very large watersheds.
     """
     if start in cache:
-        return ([start] + cache[start], cache) if rlist else cache
+        return (cache[start].union([start]), cache) if rlist else cache
     if toset is None:
         toset = set([x[1] for x in pairs])
     if not start in toset:
         # base case: it's not downstream of anything
-        return ([start], {start: []}) if rlist else {start: []}
+        return (set([start]), {start: set()}) if rlist else {start: set()}
     upstreams = [p[0] for p in pairs if p[1] == start]
     allup = set(upstreams)
     outset = set(upstreams)
@@ -1000,7 +1000,7 @@ def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
         for ident in tofrom[identifier]:
             mapping = recurse_network(ident, pairs, toset, mapping, rlist=False)
         for k in mapping:
-            mapping[k].append(k)
+            mapping[k].add(k)
     if build_only:
         return mapping
     # mapping is now a dictionary of site identifier --> [upstream identifiers]
