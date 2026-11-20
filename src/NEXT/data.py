@@ -39,6 +39,7 @@ import NEXT.wforecast as wfc
 import warnings
 import os
 import rioxarray
+from queue import SimpleQueue
 
 tid = "10343500"
 nldi_inst = [None]
@@ -785,6 +786,29 @@ def all_data_gpkg(path, start, end, weather="gridmet", lc="nlcd",
             yield (k, handler(k, v[0], e))
 
 
+# mapping=
+# 1 -> 2, 3, 4, 5, 6, 7, 8, 9, 10
+# 2 -> 3
+# 3 -> []
+# 4 -> []
+# 5 -> 6, 7, 8, 9, 10
+# 6 -> 7, 8, 9, 10
+# 7 -> []
+# 8 -> 9, 10
+# 9 -> 10
+# 10 -> []
+testnet_pairs = [
+    (10, 9),
+    (9, 8),
+    (8, 6),
+    (7, 6),
+    (6, 5),
+    (5, 1),
+    (4, 1),
+    (3, 2),
+    (2, 1)
+    ]
+
 def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
     """
     Recursively build the network for a given outflow watershed, also storing
@@ -807,7 +831,7 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
     -------
     tuple of (list, dictionary)
         The list is all upstream watersheds, including start.
-        The dictionary is equivalent lists for each upstream watershed,
+        The dictionary is equivalent sets for each upstream watershed,
         used to cache previous results. This excludes the watershed itself.
     
     Notes
@@ -815,25 +839,61 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
     While the concept is recursive, this is iterative in order to avoid
     maxing out recursion depth for very large watersheds.
     """
+    if start in cache:
+        return ([start] + cache[start], cache) if rlist else cache
     if toset is None:
         toset = set([x[1] for x in pairs])
     if not start in toset:
         # base case: it's not downstream of anything
         return ([start], {start: []}) if rlist else {start: []}
     upstreams = [p[0] for p in pairs if p[1] == start]
+    allup = set(upstreams)
     outset = set(upstreams)
     outdict = cache
-    # build the full dictionary
-    for up in upstreams:
-        if not up in outdict:
-            for (k, v) in recurse_network(up, pairs, toset, cache, rlist=False).items():
-                outdict[k] = v
+    # initial
+    downdict = {p[1]: set() for p in pairs} | {p[0]: set([p[1]]) for p in pairs}
+    # Build the full dictionary. How do we do this iteratively?
+    # We repeatedly pass over the dictionary until we run out of recursions.
+    # How do we make sure everything gets updated? Also build a downstream
+    # dictionary.
+    added = True
+    checked = set(cache)
+    while added:
+        added = False
+        newup = allup.copy()
+        for k in allup:
+            if k in outdict:
+                dorun = outdict[k].union([k])
+            else:
+                dorun = [k]
+            for it in dorun:
+                if it != k:
+                    downdict[it].add(k)
+                newup.add(it)
+                if not it in checked:
+                    added = True
+                    if not it in outdict:
+                        outdict[it] = set()
+                        for p in pairs:
+                            if p[1] == it:
+                                outdict[k].add(p[0])
+                                outdict[it].add(p[0])
+                                newup.add(p[0])
+                                for ds in downdict[it]:
+                                    if not ds in outdict:
+                                        outdict[ds] = set()
+                                    outdict[ds].add(p[0])
+                    else:
+                        outdict[k] = outdict[k].union(outdict[it])
+            checked.add(k)
+        allup = newup
+    
     # now update the set
     for k in upstreams:
         for itm in outdict[k]:
             outset.add(itm)
     outlist = list(outset)
-    outdict[start] = outlist
+    outdict[start] = outset
     outlist = [start] + outlist
     return (outlist, outdict) if rlist else outdict
 
