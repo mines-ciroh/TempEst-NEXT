@@ -809,6 +809,11 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
         The list is all upstream watersheds, including start.
         The dictionary is equivalent lists for each upstream watershed,
         used to cache previous results. This excludes the watershed itself.
+    
+    Notes
+    -----
+    While the concept is recursive, this is iterative in order to avoid
+    maxing out recursion depth for very large watersheds.
     """
     if toset is None:
         toset = set([x[1] for x in pairs])
@@ -890,7 +895,9 @@ def wsweights(start, data: pd.DataFrame, mapping: dict, identifier: str = 'id',
 
 
 def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
-                   identifier: str = 'id', tocol: str = 'to') -> pd.DataFrame:
+                   identifier: str = 'id', tocol: str = 'to',
+                   build_only: bool = False, mapping: dict = None,
+                   return_map: bool = False) -> pd.DataFrame:
     """
     Converts an input dataset with nested watersheds (individually) into
     an input dataset where downstream watersheds use area-weighted upstream inputs.
@@ -910,6 +917,12 @@ def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
         Site identifier column in tofrom. Default: "id".
     tocol : str, optional
         Column specifying where a watershed flows to in tofrom. Default: "to".
+    build_only : bool, optional
+        If true, just build and return the network (data is ignored).
+    mapping : dict, optional
+        Provide a pre-built mapping to avoid redoing a rather involved process.
+    return_map : bool, optional
+        If True, return the mapping as well as the data.
 
     Returns
     -------
@@ -921,15 +934,21 @@ def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
     # First, we build a mapping from tofrom to decide what is included. We do
     # this recursively, but need to be smart about caching.
     toset = set(tofrom[tocol])
-    mapping = {}
-    pairs = list(tofrom[[identifier, tocol]].itertuples(index=False))
-    for ident in tofrom[identifier]:
-        mapping = recurse_network(ident, pairs, toset, mapping, rlist=False)
-    for k in mapping:
-        mapping[k].append(k)
+    if mapping is None:
+        mapping = {}
+        pairs = list(tofrom[[identifier, tocol]].itertuples(index=False))
+        for ident in tofrom[identifier]:
+            mapping = recurse_network(ident, pairs, toset, mapping, rlist=False)
+        for k in mapping:
+            mapping[k].append(k)
+    if build_only:
+        return mapping
     # mapping is now a dictionary of site identifier --> [upstream identifiers]
     # Now we can use wsweights to combine everything.
-    return pd.concat([
+    res = pd.concat([
         wsweights(start, data, mapping)
         for start in data['id'].unique()
         ])
+    if return_map:
+        return (mapping, res)
+    return res
