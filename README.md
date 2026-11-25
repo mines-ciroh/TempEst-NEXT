@@ -92,4 +92,4 @@ NEXT will process an input dataset to estimate model coefficients and will then 
 
 If you use TempEst-NEXT in your research, please cite:
 
-Philippus, Corona and Hogue. "Daily Stream Water Temperature Modeling and Forecasting for Ungaged Watersheds at the CONUS Scale." In review.
+Philippus, D., C. R. Corona, and T. S. Hogue. 2026. “Daily Stream Water Temperature Modeling and Forecasting for Ungaged Watersheds at the CONUS Scale.” Journal of Hydrology. https://doi.org/10.1016/j.jhydrol.2026.135620.

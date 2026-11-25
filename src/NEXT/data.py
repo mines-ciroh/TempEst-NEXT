@@ -845,7 +845,8 @@ def recurse_network(start, pairs, toset=None, cache={}, rlist=True):
         toset = set([x[1] for x in pairs])
     if not start in toset:
         # base case: it's not downstream of anything
-        return (set([start]), {start: set()}) if rlist else {start: set()}
+        ncache = {start: set()} | cache
+        return (set([start]), ncache) if rlist else ncache
     upstreams = [p[0] for p in pairs if p[1] == start]
     allup = set(upstreams)
     outset = set(upstreams)
@@ -987,9 +988,7 @@ def multiwatershed(data: pd.DataFrame, tofrom: pd.DataFrame,
     Returns
     -------
     pd.DataFrame
-        Like data, but switched to area-weighted setup for nesting. Also adds
-        columns "upcount" (total upstream watershed) and "uporder" (Strahler
-        stream order where a headwaters watershed equals first-order).
+        Like data, but switched to area-weighted setup for nesting.
     """
     # First, we build a mapping from tofrom to decide what is included. We do
     # this recursively, but need to be smart about caching.
